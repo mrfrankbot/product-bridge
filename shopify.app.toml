@@ -3,7 +3,7 @@
 
 name = "Product Bridge"
 client_id = "b3858538da509600efa38d560ca48cd7"
-application_url = "https://product-bridge.vercel.app"
+application_url = "https://product-bridge.replit.app"
 embedded = true
 
 [access_scopes]
@@ -12,7 +12,7 @@ scopes = "read_products,write_products"
 
 [auth]
 redirect_urls = [
-  "https://product-bridge.vercel.app/auth/callback"
+  "https://product-bridge.replit.app/auth/callback"
 ]
 
 [webhooks]
