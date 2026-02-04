@@ -1,1 +1,31 @@
-.vercel
+# Dependencies
+node_modules/
+
+# Environment files - NEVER COMMIT SECRETS
+.env
+.env.local
+.env.production
+.env.replit
+.env.*
+
+# Build output
+build/
+dist/
+
+# Shopify
+.shopify/
+
+# Vercel
+.vercel/
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
