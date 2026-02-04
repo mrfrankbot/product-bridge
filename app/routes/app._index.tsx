@@ -32,7 +32,7 @@ interface EnhancedProduct {
 
 const DASHBOARD_QUERY = `#graphql
   query ProductBridgeDashboard {
-    productsCount(query: "metafields.namespace:product_bridge")
+    productsCount(query: "metafields.namespace:product_bridge") { count }
     products(
       first: 5
       sortKey: UPDATED_AT
@@ -91,7 +91,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }) || [];
 
   return json({
-    totalEnhanced: data.data?.productsCount || 0,
+    totalEnhanced: data.data?.productsCount?.count || 0,
     recentProducts,
   });
 };
