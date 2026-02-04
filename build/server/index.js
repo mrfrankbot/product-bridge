@@ -1,16 +1,16 @@
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { PassThrough } from 'node:stream';
-import { createReadableStreamFromReadable, unstable_createMemoryUploadHandler, unstable_parseMultipartFormData, json, redirect } from '@remix-run/node';
+import { createReadableStreamFromReadable, json, unstable_createMemoryUploadHandler, unstable_parseMultipartFormData, redirect } from '@remix-run/node';
 import { RemixServer, Meta, Links, Outlet, ScrollRestoration, Scripts, useLoaderData, useFetcher, useRouteError, useActionData, Form, Link } from '@remix-run/react';
 import * as isbotModule from 'isbot';
 import { renderToPipeableStream } from 'react-dom/server';
-import { useRef, useState, useEffect, useCallback } from 'react';
-import { Thumbnail, Page, BlockStack, Banner, Card, Text, Autocomplete, Icon, InlineStack, Badge, Tabs, TextField, Button, DropZone, Divider, Modal, Box, ProgressBar, Spinner, AppProvider, FormLayout } from '@shopify/polaris';
-import { SearchIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, NoteIcon, FileIcon, GlobeIcon, MagicIcon } from '@shopify/polaris-icons';
+import OpenAI from 'openai';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Box, InlineStack, Text, Card, BlockStack, Icon, Badge, ProgressBar, Spinner, Thumbnail, Autocomplete, Button, Banner, Page, TextField, DropZone, Modal, AppProvider, FormLayout } from '@shopify/polaris';
+import { ChevronDownIcon, ChevronRightIcon, NoteIcon, SearchIcon, CheckIcon, FileIcon, GlobeIcon, MagicIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon } from '@shopify/polaris-icons';
 import '@shopify/shopify-app-remix/adapters/node';
 import { shopifyApp, AppDistribution, LATEST_API_VERSION, boundary } from '@shopify/shopify-app-remix/server';
 import { MemorySessionStorage } from '@shopify/shopify-app-session-storage-memory';
-import OpenAI from 'openai';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
 import { AppProvider as AppProvider$1 } from '@shopify/shopify-app-remix/react';
@@ -157,29 +157,6 @@ const route0 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: App$1
 }, Symbol.toStringTag, { value: 'Module' }));
-
-const sessionStorage = new MemorySessionStorage();
-console.log("Using Memory session storage");
-const shopify = shopifyApp({
-  apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: LATEST_API_VERSION,
-  scopes: process.env.SCOPES?.split(",") || ["read_products", "write_products", "read_metafields", "write_metafields"],
-  appUrl: process.env.SHOPIFY_APP_URL || "",
-  authPathPrefix: "/auth",
-  sessionStorage,
-  distribution: AppDistribution.AppStore,
-  isEmbeddedApp: true,
-  future: {
-    unstable_newEmbeddedAuthStrategy: true
-  },
-  ...process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}
-});
-shopify.addDocumentResponseHeaders;
-const authenticate = shopify.authenticate;
-shopify.unauthenticated;
-const login = shopify.login;
-shopify.registerWebhooks;
 
 const DEFAULT_OPTIONS = {
   maxAttempts: 3,
@@ -447,1093 +424,6 @@ ${rawText}`
   }
 }
 
-async function parsePdf(buffer) {
-  try {
-    const data = await pdf(buffer);
-    if (!data.text || data.text.trim().length < 50) {
-      const error = {
-        code: "pdf.no_text",
-        message: "Could not extract text from PDF.",
-        suggestion: "The file may be image-based or encrypted. Try an OCR-processed PDF or paste specs directly."
-      };
-      throw error;
-    }
-    return {
-      text: data.text,
-      numPages: data.numpages,
-      info: {
-        title: data.info?.Title,
-        author: data.info?.Author,
-        subject: data.info?.Subject
-      }
-    };
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error) {
-      throw error;
-    }
-    console.error("PDF parsing failed:", error);
-    const userError = {
-      code: "pdf.parsing_failed",
-      message: "Failed to parse PDF file.",
-      suggestion: "The file may be corrupted or in an unsupported format. Try re-exporting or downloading the PDF again."
-    };
-    throw userError;
-  }
-}
-
-const SPEC_SELECTORS = [
-  // Generic specs tables
-  'table[class*="spec"]',
-  'table[class*="Spec"]',
-  'div[class*="spec"]',
-  'div[class*="Spec"]',
-  'section[class*="spec"]',
-  '[data-testid*="spec"]',
-  // Product descriptions
-  'div[class*="product-description"]',
-  'div[class*="ProductDescription"]',
-  'div[class*="description"]',
-  '[itemprop="description"]',
-  // Features
-  'div[class*="feature"]',
-  'div[class*="Feature"]',
-  'ul[class*="feature"]',
-  // Canon specific
-  ".productSpec",
-  ".product-spec",
-  "#productSpec",
-  ".specifications",
-  // Sony specific
-  ".ProductSpecification",
-  ".spec-table",
-  '[class*="SpecList"]',
-  // Nikon specific
-  ".productSpecs",
-  ".specificationTable",
-  // Generic fallbacks
-  "article",
-  "main",
-  ".product-detail",
-  ".product-info"
-];
-const SKIP_SELECTORS = [
-  "nav",
-  "header",
-  "footer",
-  ".nav",
-  ".header",
-  ".footer",
-  ".menu",
-  ".sidebar",
-  ".cookie",
-  ".newsletter",
-  ".social",
-  '[role="navigation"]',
-  '[role="banner"]',
-  '[role="contentinfo"]',
-  "script",
-  "style",
-  "noscript"
-];
-function detectManufacturer(url) {
-  const hostname = new URL(url).hostname.toLowerCase();
-  const manufacturers = {
-    "canon": "Canon",
-    "sony": "Sony",
-    "nikon": "Nikon",
-    "fujifilm": "Fujifilm",
-    "panasonic": "Panasonic",
-    "olympus": "Olympus",
-    "leica": "Leica",
-    "sigma": "Sigma",
-    "tamron": "Tamron",
-    "zeiss": "Zeiss",
-    "hasselblad": "Hasselblad",
-    "dji": "DJI",
-    "gopro": "GoPro",
-    "blackmagic": "Blackmagic",
-    "rode": "Rode",
-    "sennheiser": "Sennheiser",
-    "manfrotto": "Manfrotto",
-    "gitzo": "Gitzo",
-    "profoto": "Profoto",
-    "godox": "Godox",
-    "peak design": "Peak Design",
-    "peakdesign": "Peak Design",
-    "benq": "BenQ"
-  };
-  for (const [key, name] of Object.entries(manufacturers)) {
-    if (hostname.includes(key)) {
-      return name;
-    }
-  }
-  return void 0;
-}
-function cleanText(text) {
-  return text.replace(/[\t\r]+/g, " ").replace(/\n{3,}/g, "\n\n").replace(/ {2,}/g, " ").split("\n").map((line) => line.trim()).join("\n").trim();
-}
-function extractSpecText($) {
-  SKIP_SELECTORS.forEach((selector) => {
-    $(selector).remove();
-  });
-  const textParts = [];
-  for (const selector of SPEC_SELECTORS) {
-    const elements = $(selector);
-    if (elements.length > 0) {
-      elements.each((_, el) => {
-        const text = $(el).text();
-        if (text.length > 50) {
-          textParts.push(text);
-        }
-      });
-      if (textParts.join("").length > 500) {
-        break;
-      }
-    }
-  }
-  if (textParts.length === 0) {
-    const bodyText = $("body").text();
-    textParts.push(bodyText);
-  }
-  return cleanText(textParts.join("\n\n"));
-}
-function extractTables($) {
-  const tableParts = [];
-  $("table").each((_, table) => {
-    const rows = [];
-    $(table).find("tr").each((_2, tr) => {
-      const cells = [];
-      $(tr).find("th, td").each((_3, cell) => {
-        cells.push($(cell).text().trim());
-      });
-      if (cells.length > 0) {
-        rows.push(cells.join(": "));
-      }
-    });
-    if (rows.length > 0) {
-      tableParts.push(rows.join("\n"));
-    }
-  });
-  return tableParts.join("\n\n");
-}
-async function scrapeProductPage(url) {
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(url);
-  } catch {
-    const error = {
-      code: "url.invalid",
-      message: "That URL doesn't look valid.",
-      suggestion: "Include the full https:// address."
-    };
-    throw error;
-  }
-  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-    const error = {
-      code: "url.protocol",
-      message: "Only HTTP and HTTPS URLs are supported.",
-      suggestion: "Use an https:// product page."
-    };
-    throw error;
-  }
-  const host = parsedUrl.hostname.toLowerCase();
-  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "10.", "192.168.", "172."];
-  if (blocked.some((b) => host.includes(b)) || host.endsWith(".local") || host.endsWith(".internal")) {
-    const error = {
-      code: "url.blocked",
-      message: "Local or internal URLs are not allowed.",
-      suggestion: "Use a public manufacturer product page."
-    };
-    throw error;
-  }
-  try {
-    const fetchResult = await retryFetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9"
-      }
-    });
-    if (!fetchResult.success) {
-      const error = fetchResult.error;
-      let errorMsg;
-      const status = error?.status;
-      switch (status) {
-        case 403:
-          errorMsg = {
-            code: "url.blocked",
-            message: "This site blocked automated access.",
-            suggestion: "Try another product page or paste specs directly."
-          };
-          break;
-        case 404:
-          errorMsg = {
-            code: "url.not_found",
-            message: "The product page was not found.",
-            suggestion: "Check the URL or try a different product page."
-          };
-          break;
-        case 429:
-          errorMsg = {
-            code: "url.rate_limited",
-            message: "Too many requests to this site.",
-            suggestion: "Wait a few minutes and try again."
-          };
-          break;
-        default:
-          errorMsg = {
-            code: "url.fetch_failed",
-            message: `Failed to fetch page: ${error.message}`,
-            suggestion: "Check the URL or try again later."
-          };
-      }
-      throw errorMsg;
-    }
-    const response = fetchResult.data;
-    if (!response.ok) {
-      let errorMsg;
-      switch (response.status) {
-        case 403:
-          errorMsg = {
-            code: "url.blocked",
-            message: "This site blocked automated access.",
-            suggestion: "Try another product page or paste specs directly."
-          };
-          break;
-        case 404:
-          errorMsg = {
-            code: "url.not_found",
-            message: "The product page was not found.",
-            suggestion: "Check the URL or try a different product page."
-          };
-          break;
-        case 429:
-          errorMsg = {
-            code: "url.rate_limited",
-            message: "Too many requests to this site.",
-            suggestion: "Wait a few minutes and try again."
-          };
-          break;
-        default:
-          errorMsg = {
-            code: "url.server_error",
-            message: `Manufacturer site error: ${response.status}`,
-            suggestion: "Try again later or use a different source."
-          };
-      }
-      throw errorMsg;
-    }
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const title = $("title").text().trim() || $("h1").first().text().trim() || "Unknown Product";
-    const tableText = extractTables($);
-    const specText = extractSpecText($);
-    const combinedText = [tableText, specText].filter((t) => t.length > 0).join("\n\n---\n\n");
-    if (!combinedText.trim()) {
-      const error = {
-        code: "url.no_content",
-        message: "No content could be extracted from this page.",
-        suggestion: "Try a different product page or paste specs directly."
-      };
-      throw error;
-    }
-    const maxLength = 3e4;
-    const text = combinedText.length > maxLength ? combinedText.slice(0, maxLength) + "\n\n[Content truncated...]" : combinedText;
-    return {
-      title,
-      text,
-      url,
-      manufacturer: detectManufacturer(url)
-    };
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error) {
-      throw error;
-    }
-    console.error("URL scraping failed:", error);
-    const userError = {
-      code: "url.scraping_failed",
-      message: "Failed to scrape the URL.",
-      suggestion: "Check the URL or try again later."
-    };
-    throw userError;
-  }
-}
-
-function validateUrlInput(raw) {
-  const value = raw?.trim();
-  if (!value) return { ok: false, error: { code: "url.empty", message: "URL is required.", suggestion: "Paste a full https:// product page URL." } };
-  let parsed;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return { ok: false, error: { code: "url.invalid", message: "That URL doesn't look valid.", suggestion: "Include https:// at the beginning." } };
-  }
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    return { ok: false, error: { code: "url.protocol", message: "Only HTTP/HTTPS URLs are supported.", suggestion: "Use an https:// product page." } };
-  }
-  const host = parsed.hostname.toLowerCase();
-  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1"];
-  if (blocked.includes(host) || host.endsWith(".local") || host.endsWith(".internal")) {
-    return { ok: false, error: { code: "url.blocked", message: "Local or internal URLs are not allowed.", suggestion: "Use a public manufacturer product page." } };
-  }
-  return { ok: true, value: parsed.toString() };
-}
-async function validatePdfFile(file) {
-  if (!file || file.size === 0) return { ok: false, error: { code: "pdf.missing", message: "No PDF file provided.", suggestion: "Upload a PDF spec sheet or brochure." } };
-  if (file.size > 2e7) return { ok: false, error: { code: "pdf.too_large", message: "PDF is larger than 20MB.", suggestion: "Export a smaller PDF or split it into parts." } };
-  if (file.type && file.type !== "application/pdf") {
-    return { ok: false, error: { code: "pdf.type", message: "Only PDF files are supported.", suggestion: "Upload a .pdf file." } };
-  }
-  const buf = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-  const signature = String.fromCharCode(...buf);
-  if (signature !== "%PDF") {
-    return { ok: false, error: { code: "pdf.invalid", message: "This file doesn't look like a valid PDF.", suggestion: "Re‑export or download the PDF again." } };
-  }
-  return { ok: true, file };
-}
-function validateTextInput(text) {
-  const value = text?.trim() || "";
-  if (value.length < 50) {
-    return { ok: false, error: { code: "text.short", message: "Text is too short to extract reliable specs.", suggestion: "Paste the full spec sheet or at least a few paragraphs." } };
-  }
-  if (value.length > 6e4) {
-    return { ok: false, error: { code: "text.long", message: "Text is too long to process in one pass.", suggestion: "Trim to the spec section only or split into parts." } };
-  }
-  return { ok: true, value };
-}
-function validateContentPayload(raw) {
-  if (!raw || typeof raw !== "object") {
-    return { ok: false, error: { code: "content.invalid", message: "Content payload is invalid.", suggestion: "Re‑extract content before saving." } };
-  }
-  const c = raw;
-  const okArray = (v) => Array.isArray(v);
-  if (!okArray(c.specs) || !okArray(c.highlights) || !okArray(c.included) || !okArray(c.featured)) {
-    return { ok: false, error: { code: "content.shape", message: "Extracted content is incomplete.", suggestion: "Re‑extract content and try saving again." } };
-  }
-  return { ok: true, value: c };
-}
-
-function asUserError(err, fallback) {
-  if (typeof err === "object" && err && "code" in err && "message" in err) {
-    return err;
-  }
-  return fallback;
-}
-
-const PRODUCTS_QUERY$1 = `#graphql
-  query ProductsQuery($query: String, $first: Int!) {
-    products(first: $first, query: $query) {
-      edges {
-        node {
-          id
-          title
-          handle
-          featuredImage {
-            url
-            altText
-          }
-        }
-      }
-    }
-  }
-`;
-const METAFIELDS_SET_MUTATION$1 = `#graphql
-  mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
-    metafieldsSet(metafields: $metafields) {
-      metafields {
-        id
-        namespace
-        key
-        value
-      }
-      userErrors {
-        field
-        message
-      }
-    }
-  }
-`;
-const loader$5 = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const url = new URL(request.url);
-  const searchQuery = url.searchParams.get("search") || "";
-  const response = await admin.graphql(PRODUCTS_QUERY$1, {
-    variables: {
-      query: searchQuery ? `title:*${searchQuery}*` : "",
-      first: 25
-    }
-  });
-  const data = await response.json();
-  const products = data.data?.products?.edges?.map((edge) => edge.node) || [];
-  return json({ products });
-};
-const action$4 = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const contentType = request.headers.get("content-type") || "";
-  let formData;
-  if (contentType.includes("multipart/form-data")) {
-    const uploadHandler = unstable_createMemoryUploadHandler({
-      maxPartSize: 2e7
-      // 20MB max
-    });
-    formData = await unstable_parseMultipartFormData(request, uploadHandler);
-  } else {
-    formData = await request.formData();
-  }
-  const intent = formData.get("intent");
-  if (intent === "extract-pdf") {
-    const file = formData.get("pdf");
-    const fileValidation = await validatePdfFile(file);
-    if (!fileValidation.ok) {
-      return json({ error: fileValidation.error }, { status: 400 });
-    }
-    try {
-      const arrayBuffer = await fileValidation.file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const pdfResult = await parsePdf(buffer);
-      const result = await extractProductContent(pdfResult.text);
-      return json({
-        extracted: result,
-        source: {
-          type: "pdf",
-          filename: fileValidation.file.name,
-          pages: pdfResult.numPages
-        }
-      });
-    } catch (error) {
-      console.error("PDF extraction error:", error);
-      const userError = asUserError(error, {
-        code: "pdf.processing_failed",
-        message: "Failed to process PDF",
-        suggestion: "Try a different PDF or paste specs directly."
-      });
-      return json({ error: userError }, { status: 500 });
-    }
-  }
-  if (intent === "extract-url") {
-    const urlInput = formData.get("url");
-    const urlValidation = validateUrlInput(urlInput);
-    if (!urlValidation.ok) {
-      return json({ error: urlValidation.error }, { status: 400 });
-    }
-    try {
-      const scrapeResult = await scrapeProductPage(urlValidation.value);
-      const result = await extractProductContent(scrapeResult.text);
-      return json({
-        extracted: result,
-        source: {
-          type: "url",
-          url: scrapeResult.url,
-          title: scrapeResult.title,
-          manufacturer: scrapeResult.manufacturer
-        }
-      });
-    } catch (error) {
-      console.error("URL scraping error:", error);
-      const userError = asUserError(error, {
-        code: "url.processing_failed",
-        message: "Failed to scrape URL",
-        suggestion: "Check the URL or try again later."
-      });
-      return json({ error: userError }, { status: 500 });
-    }
-  }
-  if (intent === "extract") {
-    const textInput = formData.get("text");
-    const textValidation = validateTextInput(textInput);
-    if (!textValidation.ok) {
-      return json({ error: textValidation.error }, { status: 400 });
-    }
-    try {
-      const result = await extractProductContent(textValidation.value);
-      return json({ extracted: result, source: { type: "text" } });
-    } catch (error) {
-      console.error("Text extraction error:", error);
-      const userError = asUserError(error, {
-        code: "text.processing_failed",
-        message: "Failed to extract content from text",
-        suggestion: "Try different text or check your internet connection."
-      });
-      return json({ error: userError }, { status: 500 });
-    }
-  }
-  if (intent === "save") {
-    const productId = formData.get("productId");
-    const contentJson = formData.get("content");
-    if (!productId) {
-      return json({
-        error: {
-          code: "save.no_product",
-          message: "No product selected.",
-          suggestion: "Select a product in Step 1 before saving."
-        }
-      }, { status: 400 });
-    }
-    if (!contentJson) {
-      return json({
-        error: {
-          code: "save.no_content",
-          message: "No content to save.",
-          suggestion: "Extract content first before saving."
-        }
-      }, { status: 400 });
-    }
-    try {
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(contentJson);
-      } catch {
-        return json({
-          error: {
-            code: "save.invalid_json",
-            message: "Content data is corrupted.",
-            suggestion: "Re-extract content and try saving again."
-          }
-        }, { status: 400 });
-      }
-      const contentValidation = validateContentPayload(parsedContent);
-      if (!contentValidation.ok) {
-        return json({ error: contentValidation.error }, { status: 400 });
-      }
-      const content = contentValidation.value;
-      const metafields = [
-        {
-          ownerId: productId,
-          namespace: "product_bridge",
-          key: "specs",
-          type: "json",
-          value: JSON.stringify(content.specs)
-        },
-        {
-          ownerId: productId,
-          namespace: "product_bridge",
-          key: "highlights",
-          type: "json",
-          value: JSON.stringify(content.highlights)
-        },
-        {
-          ownerId: productId,
-          namespace: "product_bridge",
-          key: "included",
-          type: "json",
-          value: JSON.stringify(content.included)
-        },
-        {
-          ownerId: productId,
-          namespace: "product_bridge",
-          key: "featured",
-          type: "json",
-          value: JSON.stringify(content.featured)
-        }
-      ];
-      const shopifyResult = await retryShopify(
-        () => admin.graphql(METAFIELDS_SET_MUTATION$1, {
-          variables: { metafields }
-        })
-      );
-      if (!shopifyResult.success) {
-        const userError = {
-          code: "save.shopify_failed",
-          message: "Failed to save to Shopify after retries.",
-          suggestion: "Check your connection and try again."
-        };
-        throw userError;
-      }
-      const response = shopifyResult.data;
-      const result = await response.json();
-      const errors = result.data?.metafieldsSet?.userErrors;
-      if (errors?.length > 0) {
-        const errorMessages = errors.map((e) => e.message).join(", ");
-        return json({
-          error: {
-            code: "save.shopify_error",
-            message: `Shopify rejected the metafields: ${errorMessages}`,
-            suggestion: "Check that all fields contain valid values and try again."
-          }
-        }, { status: 400 });
-      }
-      return json({ success: true, saved: result.data?.metafieldsSet?.metafields });
-    } catch (error) {
-      console.error("Save error:", error);
-      const userError = asUserError(error, {
-        code: "save.failed",
-        message: "Failed to save metafields",
-        suggestion: "Check your connection and try again."
-      });
-      return json({ error: userError }, { status: 500 });
-    }
-  }
-  return json({ error: "Invalid intent" }, { status: 400 });
-};
-function AppIndex$1() {
-  const { products } = useLoaderData();
-  const fetcher = useFetcher();
-  useRef(null);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [searchValue, setSearchValue] = useState("");
-  const [specsText, setSpecsText] = useState("");
-  const [content, setContent] = useState(null);
-  const [showPreview, setShowPreview] = useState(false);
-  const [inputTab, setInputTab] = useState(0);
-  const [urlValue, setUrlValue] = useState("");
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [sourceInfo, setSourceInfo] = useState(null);
-  const isExtracting = fetcher.state === "submitting" && (fetcher.formData?.get("intent") === "extract" || fetcher.formData?.get("intent") === "extract-pdf" || fetcher.formData?.get("intent") === "extract-url");
-  const isSaving = fetcher.state === "submitting" && fetcher.formData?.get("intent") === "save";
-  const extractResult = fetcher.data;
-  useEffect(() => {
-    if (extractResult?.extracted) {
-      setContent(extractResult.extracted);
-      if (extractResult.source) {
-        setSourceInfo(extractResult.source);
-      }
-    }
-  }, [extractResult]);
-  const handleFileDrop = useCallback((_dropFiles, acceptedFiles) => {
-    if (acceptedFiles.length > 0) {
-      setUploadedFile(acceptedFiles[0]);
-    }
-  }, []);
-  const handlePdfExtract = () => {
-    if (!uploadedFile) return;
-    const formData = new FormData();
-    formData.append("intent", "extract-pdf");
-    formData.append("pdf", uploadedFile);
-    fetcher.submit(formData, {
-      method: "post",
-      encType: "multipart/form-data"
-    });
-  };
-  const handleUrlExtract = () => {
-    if (!urlValue.trim()) return;
-    const formData = new FormData();
-    formData.append("intent", "extract-url");
-    formData.append("url", urlValue.trim());
-    fetcher.submit(formData, { method: "post" });
-  };
-  const inputTabs = [
-    { id: "text", content: "📝 Paste Text" },
-    { id: "pdf", content: "📄 Upload PDF" },
-    { id: "url", content: "🔗 Scrape URL" }
-  ];
-  const productOptions = products.map((p) => ({
-    value: p.id,
-    label: p.title,
-    media: p.featuredImage?.url ? /* @__PURE__ */ jsx(Thumbnail, { source: p.featuredImage.url, alt: p.featuredImage.altText || p.title, size: "small" }) : void 0
-  }));
-  const handleProductSelect = useCallback(
-    (selected) => {
-      const product = products.find((p) => p.id === selected[0]);
-      if (product) {
-        setSelectedProduct(product);
-        setSearchValue(product.title);
-      }
-    },
-    [products]
-  );
-  const updateHighlight = (index, value) => {
-    if (!content) return;
-    const newHighlights = [...content.highlights];
-    newHighlights[index] = value;
-    setContent({ ...content, highlights: newHighlights });
-  };
-  const removeHighlight = (index) => {
-    if (!content) return;
-    setContent({ ...content, highlights: content.highlights.filter((_, i) => i !== index) });
-  };
-  const addHighlight = () => {
-    if (!content) return;
-    setContent({ ...content, highlights: [...content.highlights, ""] });
-  };
-  const updateFeatured = (index, field, value) => {
-    if (!content) return;
-    const newFeatured = [...content.featured];
-    newFeatured[index] = { ...newFeatured[index], [field]: value };
-    setContent({ ...content, featured: newFeatured });
-  };
-  const removeFeatured = (index) => {
-    if (!content) return;
-    setContent({ ...content, featured: content.featured.filter((_, i) => i !== index) });
-  };
-  const addFeatured = () => {
-    if (!content) return;
-    setContent({ ...content, featured: [...content.featured, { title: "", value: "" }] });
-  };
-  const updateIncluded = (index, field, value) => {
-    if (!content) return;
-    const newIncluded = [...content.included];
-    newIncluded[index] = { ...newIncluded[index], [field]: value };
-    setContent({ ...content, included: newIncluded });
-  };
-  const removeIncluded = (index) => {
-    if (!content) return;
-    setContent({ ...content, included: content.included.filter((_, i) => i !== index) });
-  };
-  const addIncluded = () => {
-    if (!content) return;
-    setContent({ ...content, included: [...content.included, { title: "", link: "" }] });
-  };
-  const updateSpecLine = (groupIndex, lineIndex, field, value) => {
-    if (!content) return;
-    const newSpecs = [...content.specs];
-    newSpecs[groupIndex] = {
-      ...newSpecs[groupIndex],
-      lines: newSpecs[groupIndex].lines.map(
-        (line, i) => i === lineIndex ? { ...line, [field]: value } : line
-      )
-    };
-    setContent({ ...content, specs: newSpecs });
-  };
-  const removeSpecLine = (groupIndex, lineIndex) => {
-    if (!content) return;
-    const newSpecs = [...content.specs];
-    newSpecs[groupIndex] = {
-      ...newSpecs[groupIndex],
-      lines: newSpecs[groupIndex].lines.filter((_, i) => i !== lineIndex)
-    };
-    setContent({ ...content, specs: newSpecs });
-  };
-  const handleSave = () => {
-    if (!selectedProduct || !content) return;
-    const formData = new FormData();
-    formData.append("intent", "save");
-    formData.append("productId", selectedProduct.id);
-    formData.append("content", JSON.stringify(content));
-    fetcher.submit(formData, { method: "post" });
-  };
-  return /* @__PURE__ */ jsx(Page, { title: "Product Bridge", subtitle: "AI-powered product content automation", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-    extractResult?.success && /* @__PURE__ */ jsx(
-      Banner,
-      {
-        title: "Metafields saved successfully!",
-        tone: "success",
-        onDismiss: () => {
-        }
-      }
-    ),
-    extractResult?.error && /* @__PURE__ */ jsx(
-      Banner,
-      {
-        title: "Error",
-        tone: "critical",
-        children: extractResult.error
-      }
-    ),
-    /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-      /* @__PURE__ */ jsx(Text, { as: "h2", variant: "headingMd", children: "Step 1: Select Product" }),
-      /* @__PURE__ */ jsx(
-        Autocomplete,
-        {
-          options: productOptions,
-          selected: selectedProduct ? [selectedProduct.id] : [],
-          onSelect: handleProductSelect,
-          textField: /* @__PURE__ */ jsx(
-            Autocomplete.TextField,
-            {
-              onChange: setSearchValue,
-              label: "Search products",
-              value: searchValue,
-              prefix: /* @__PURE__ */ jsx(Icon, { source: SearchIcon }),
-              placeholder: "Start typing to search...",
-              autoComplete: "off"
-            }
-          )
-        }
-      ),
-      selectedProduct && /* @__PURE__ */ jsxs(InlineStack, { gap: "400", align: "start", blockAlign: "center", children: [
-        selectedProduct.featuredImage?.url && /* @__PURE__ */ jsx(
-          Thumbnail,
-          {
-            source: selectedProduct.featuredImage.url,
-            alt: selectedProduct.title,
-            size: "medium"
-          }
-        ),
-        /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
-          /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodyMd", fontWeight: "semibold", children: selectedProduct.title }),
-          /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", tone: "subdued", children: [
-            "ID: ",
-            selectedProduct.id.replace("gid://shopify/Product/", "")
-          ] })
-        ] }),
-        /* @__PURE__ */ jsx(Badge, { tone: "info", children: "Selected" })
-      ] })
-    ] }) }),
-    /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-      /* @__PURE__ */ jsx(Text, { as: "h2", variant: "headingMd", children: "Step 2: Import Product Specs" }),
-      /* @__PURE__ */ jsx(Tabs, { tabs: inputTabs, selected: inputTab, onSelect: setInputTab }),
-      inputTab === 0 && /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-        /* @__PURE__ */ jsx(
-          TextField,
-          {
-            label: "Raw specs from manufacturer",
-            multiline: 8,
-            value: specsText,
-            onChange: setSpecsText,
-            placeholder: "Paste the full specification sheet from the manufacturer website...",
-            autoComplete: "off"
-          }
-        ),
-        /* @__PURE__ */ jsxs(fetcher.Form, { method: "post", children: [
-          /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: "extract" }),
-          /* @__PURE__ */ jsx("input", { type: "hidden", name: "text", value: specsText }),
-          /* @__PURE__ */ jsx(Button, { variant: "primary", submit: true, loading: isExtracting, disabled: !specsText.trim(), children: "Extract Content with AI" })
-        ] })
-      ] }),
-      inputTab === 1 && /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-        /* @__PURE__ */ jsx(
-          DropZone,
-          {
-            onDrop: handleFileDrop,
-            accept: ".pdf,application/pdf",
-            type: "file",
-            allowMultiple: false,
-            children: uploadedFile ? /* @__PURE__ */ jsxs(BlockStack, { gap: "200", inlineAlign: "center", children: [
-              /* @__PURE__ */ jsx(Icon, { source: ImportIcon, tone: "success" }),
-              /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodyMd", fontWeight: "semibold", children: uploadedFile.name }),
-              /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", tone: "subdued", children: [
-                (uploadedFile.size / 1024 / 1024).toFixed(2),
-                " MB"
-              ] }),
-              /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: () => setUploadedFile(null), children: "Remove" })
-            ] }) : /* @__PURE__ */ jsx(DropZone.FileUpload, { actionTitle: "Upload PDF", actionHint: "or drag and drop" })
-          }
-        ),
-        /* @__PURE__ */ jsx(InlineStack, { gap: "200", children: /* @__PURE__ */ jsx(
-          Button,
-          {
-            variant: "primary",
-            onClick: handlePdfExtract,
-            loading: isExtracting && fetcher.formData?.get("intent") === "extract-pdf",
-            disabled: !uploadedFile,
-            children: "Extract Content from PDF"
-          }
-        ) }),
-        /* @__PURE__ */ jsx(Banner, { tone: "info", children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", children: "Upload manufacturer spec sheets or product brochures. Works best with text-based PDFs. Image-only PDFs may not extract correctly." }) })
-      ] }),
-      inputTab === 2 && /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-        /* @__PURE__ */ jsx(
-          TextField,
-          {
-            label: "Manufacturer product page URL",
-            value: urlValue,
-            onChange: setUrlValue,
-            placeholder: "https://www.usa.canon.com/shop/p/eos-r5-mark-ii",
-            autoComplete: "off",
-            prefix: /* @__PURE__ */ jsx(Icon, { source: LinkIcon })
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          Button,
-          {
-            variant: "primary",
-            onClick: handleUrlExtract,
-            loading: isExtracting && fetcher.formData?.get("intent") === "extract-url",
-            disabled: !urlValue.trim(),
-            children: "Scrape & Extract Content"
-          }
-        ),
-        /* @__PURE__ */ jsx(Banner, { tone: "info", children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", children: "Supported manufacturers: Canon, Sony, Nikon, Fujifilm, Panasonic, Leica, Sigma, Tamron, DJI, GoPro, and more. Works best with product specification pages." }) })
-      ] }),
-      sourceInfo && content && /* @__PURE__ */ jsx(Banner, { tone: "success", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
-        /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", fontWeight: "semibold", children: "Content extracted successfully!" }),
-        sourceInfo.type === "pdf" && /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", children: [
-          "Source: ",
-          sourceInfo.filename,
-          " (",
-          sourceInfo.pages,
-          " pages)"
-        ] }),
-        sourceInfo.type === "url" && /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", children: [
-          "Source: ",
-          sourceInfo.title || sourceInfo.url,
-          sourceInfo.manufacturer && ` (${sourceInfo.manufacturer})`
-        ] })
-      ] }) })
-    ] }) }),
-    content && /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "500", children: [
-      /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
-        /* @__PURE__ */ jsx(Text, { as: "h2", variant: "headingMd", children: "Step 3: Review & Edit Content" }),
-        /* @__PURE__ */ jsx(Button, { variant: "tertiary", onClick: () => setShowPreview(true), children: "Preview JSON" })
-      ] }),
-      /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
-        /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
-          /* @__PURE__ */ jsxs(Text, { as: "h3", variant: "headingSm", children: [
-            "Highlights (",
-            content.highlights.length,
-            ")"
-          ] }),
-          /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: addHighlight, icon: PlusIcon, children: "Add" })
-        ] }),
-        content.highlights.map((highlight, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
-          /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
-            TextField,
-            {
-              label: "",
-              labelHidden: true,
-              value: highlight,
-              onChange: (v) => updateHighlight(index, v),
-              autoComplete: "off"
-            }
-          ) }),
-          /* @__PURE__ */ jsx(Button, { variant: "plain", tone: "critical", onClick: () => removeHighlight(index), icon: DeleteIcon })
-        ] }, index))
-      ] }),
-      /* @__PURE__ */ jsx(Divider, {}),
-      /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
-        /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
-          /* @__PURE__ */ jsxs(Text, { as: "h3", variant: "headingSm", children: [
-            "Featured Specs (",
-            content.featured.length,
-            ")"
-          ] }),
-          /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: addFeatured, icon: PlusIcon, children: "Add" })
-        ] }),
-        content.featured.map((spec, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "end", children: [
-          /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
-            TextField,
-            {
-              label: "Title",
-              value: spec.title,
-              onChange: (v) => updateFeatured(index, "title", v),
-              autoComplete: "off"
-            }
-          ) }),
-          /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
-            TextField,
-            {
-              label: "Value",
-              value: spec.value,
-              onChange: (v) => updateFeatured(index, "value", v),
-              autoComplete: "off"
-            }
-          ) }),
-          /* @__PURE__ */ jsx(Button, { variant: "plain", tone: "critical", onClick: () => removeFeatured(index), icon: DeleteIcon })
-        ] }, index))
-      ] }),
-      /* @__PURE__ */ jsx(Divider, {}),
-      /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
-        /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
-          /* @__PURE__ */ jsxs(Text, { as: "h3", variant: "headingSm", children: [
-            "What's Included (",
-            content.included.length,
-            ")"
-          ] }),
-          /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: addIncluded, icon: PlusIcon, children: "Add" })
-        ] }),
-        content.included.map((item, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "end", children: [
-          /* @__PURE__ */ jsx("div", { style: { flex: 2 }, children: /* @__PURE__ */ jsx(
-            TextField,
-            {
-              label: "Item",
-              value: item.title,
-              onChange: (v) => updateIncluded(index, "title", v),
-              autoComplete: "off"
-            }
-          ) }),
-          /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
-            TextField,
-            {
-              label: "Link (optional)",
-              value: item.link,
-              onChange: (v) => updateIncluded(index, "link", v),
-              autoComplete: "off",
-              placeholder: "/products/..."
-            }
-          ) }),
-          /* @__PURE__ */ jsx(Button, { variant: "plain", tone: "critical", onClick: () => removeIncluded(index), icon: DeleteIcon })
-        ] }, index))
-      ] }),
-      /* @__PURE__ */ jsx(Divider, {}),
-      /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
-        /* @__PURE__ */ jsxs(Text, { as: "h3", variant: "headingSm", children: [
-          "Specifications (",
-          content.specs.length,
-          " groups)"
-        ] }),
-        content.specs.map((group, groupIndex) => /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
-          /* @__PURE__ */ jsx(Text, { as: "h4", variant: "headingSm", children: group.heading }),
-          group.lines.map((line, lineIndex) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "end", children: [
-            /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
-              TextField,
-              {
-                label: "Spec",
-                value: line.title,
-                onChange: (v) => updateSpecLine(groupIndex, lineIndex, "title", v),
-                autoComplete: "off",
-                size: "slim"
-              }
-            ) }),
-            /* @__PURE__ */ jsx("div", { style: { flex: 2 }, children: /* @__PURE__ */ jsx(
-              TextField,
-              {
-                label: "Value",
-                value: line.text,
-                onChange: (v) => updateSpecLine(groupIndex, lineIndex, "text", v),
-                autoComplete: "off",
-                size: "slim"
-              }
-            ) }),
-            /* @__PURE__ */ jsx(
-              Button,
-              {
-                variant: "plain",
-                tone: "critical",
-                onClick: () => removeSpecLine(groupIndex, lineIndex),
-                icon: DeleteIcon
-              }
-            )
-          ] }, lineIndex))
-        ] }) }, groupIndex))
-      ] }),
-      /* @__PURE__ */ jsx(Divider, {}),
-      /* @__PURE__ */ jsx(InlineStack, { align: "end", children: /* @__PURE__ */ jsx(
-        Button,
-        {
-          variant: "primary",
-          onClick: handleSave,
-          loading: isSaving,
-          disabled: !selectedProduct,
-          icon: CheckIcon,
-          children: "Save to Product Metafields"
-        }
-      ) }),
-      !selectedProduct && /* @__PURE__ */ jsx(Banner, { tone: "warning", children: "Please select a product in Step 1 before saving." })
-    ] }) }),
-    /* @__PURE__ */ jsx(
-      Modal,
-      {
-        open: showPreview,
-        onClose: () => setShowPreview(false),
-        title: "JSON Preview",
-        children: /* @__PURE__ */ jsx(Modal.Section, { children: /* @__PURE__ */ jsx("pre", { style: { fontSize: "12px", overflow: "auto", maxHeight: "500px", background: "#f6f6f7", padding: "16px", borderRadius: "8px" }, children: JSON.stringify(content, null, 2) }) })
-      }
-    )
-  ] }) });
-}
-function ErrorBoundary$2() {
-  const error = useRouteError();
-  const getErrorInfo = () => {
-    if (error && typeof error === "object" && "message" in error && "suggestion" in error) {
-      return error;
-    }
-    return {
-      message: "Something went wrong.",
-      suggestion: "Try refreshing the page or re-opening the app."
-    };
-  };
-  const { message, suggestion } = getErrorInfo();
-  return /* @__PURE__ */ jsx(Page, { title: "Product Bridge", children: /* @__PURE__ */ jsx(Banner, { tone: "critical", title: message, children: suggestion }) });
-}
-
-const route1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
-  __proto__: null,
-  ErrorBoundary: ErrorBoundary$2,
-  action: action$4,
-  default: AppIndex$1,
-  loader: loader$5
-}, Symbol.toStringTag, { value: 'Module' }));
-
 async function action$3({ request }) {
   if (request.method !== "POST") {
     return json({ error: "Method not allowed" }, { status: 405 });
@@ -1552,7 +442,7 @@ async function action$3({ request }) {
   }
 }
 
-const route2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   action: action$3
 }, Symbol.toStringTag, { value: 'Module' }));
@@ -2005,6 +895,402 @@ function ProductSelector({
   ] });
 }
 
+const sessionStorage = new MemorySessionStorage();
+console.log("Using Memory session storage");
+const shopify = shopifyApp({
+  apiKey: process.env.SHOPIFY_API_KEY,
+  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
+  apiVersion: LATEST_API_VERSION,
+  scopes: process.env.SCOPES?.split(",") || ["read_products", "write_products", "read_metafields", "write_metafields"],
+  appUrl: process.env.SHOPIFY_APP_URL || "",
+  authPathPrefix: "/auth",
+  sessionStorage,
+  distribution: AppDistribution.AppStore,
+  isEmbeddedApp: true,
+  future: {
+    unstable_newEmbeddedAuthStrategy: true
+  },
+  ...process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}
+});
+shopify.addDocumentResponseHeaders;
+const authenticate = shopify.authenticate;
+shopify.unauthenticated;
+const login = shopify.login;
+shopify.registerWebhooks;
+
+async function parsePdf(buffer) {
+  try {
+    const data = await pdf(buffer);
+    if (!data.text || data.text.trim().length < 50) {
+      const error = {
+        code: "pdf.no_text",
+        message: "Could not extract text from PDF.",
+        suggestion: "The file may be image-based or encrypted. Try an OCR-processed PDF or paste specs directly."
+      };
+      throw error;
+    }
+    return {
+      text: data.text,
+      numPages: data.numpages,
+      info: {
+        title: data.info?.Title,
+        author: data.info?.Author,
+        subject: data.info?.Subject
+      }
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error) {
+      throw error;
+    }
+    console.error("PDF parsing failed:", error);
+    const userError = {
+      code: "pdf.parsing_failed",
+      message: "Failed to parse PDF file.",
+      suggestion: "The file may be corrupted or in an unsupported format. Try re-exporting or downloading the PDF again."
+    };
+    throw userError;
+  }
+}
+
+const SPEC_SELECTORS = [
+  // Generic specs tables
+  'table[class*="spec"]',
+  'table[class*="Spec"]',
+  'div[class*="spec"]',
+  'div[class*="Spec"]',
+  'section[class*="spec"]',
+  '[data-testid*="spec"]',
+  // Product descriptions
+  'div[class*="product-description"]',
+  'div[class*="ProductDescription"]',
+  'div[class*="description"]',
+  '[itemprop="description"]',
+  // Features
+  'div[class*="feature"]',
+  'div[class*="Feature"]',
+  'ul[class*="feature"]',
+  // Canon specific
+  ".productSpec",
+  ".product-spec",
+  "#productSpec",
+  ".specifications",
+  // Sony specific
+  ".ProductSpecification",
+  ".spec-table",
+  '[class*="SpecList"]',
+  // Nikon specific
+  ".productSpecs",
+  ".specificationTable",
+  // Generic fallbacks
+  "article",
+  "main",
+  ".product-detail",
+  ".product-info"
+];
+const SKIP_SELECTORS = [
+  "nav",
+  "header",
+  "footer",
+  ".nav",
+  ".header",
+  ".footer",
+  ".menu",
+  ".sidebar",
+  ".cookie",
+  ".newsletter",
+  ".social",
+  '[role="navigation"]',
+  '[role="banner"]',
+  '[role="contentinfo"]',
+  "script",
+  "style",
+  "noscript"
+];
+function detectManufacturer(url) {
+  const hostname = new URL(url).hostname.toLowerCase();
+  const manufacturers = {
+    "canon": "Canon",
+    "sony": "Sony",
+    "nikon": "Nikon",
+    "fujifilm": "Fujifilm",
+    "panasonic": "Panasonic",
+    "olympus": "Olympus",
+    "leica": "Leica",
+    "sigma": "Sigma",
+    "tamron": "Tamron",
+    "zeiss": "Zeiss",
+    "hasselblad": "Hasselblad",
+    "dji": "DJI",
+    "gopro": "GoPro",
+    "blackmagic": "Blackmagic",
+    "rode": "Rode",
+    "sennheiser": "Sennheiser",
+    "manfrotto": "Manfrotto",
+    "gitzo": "Gitzo",
+    "profoto": "Profoto",
+    "godox": "Godox",
+    "peak design": "Peak Design",
+    "peakdesign": "Peak Design",
+    "benq": "BenQ"
+  };
+  for (const [key, name] of Object.entries(manufacturers)) {
+    if (hostname.includes(key)) {
+      return name;
+    }
+  }
+  return void 0;
+}
+function cleanText(text) {
+  return text.replace(/[\t\r]+/g, " ").replace(/\n{3,}/g, "\n\n").replace(/ {2,}/g, " ").split("\n").map((line) => line.trim()).join("\n").trim();
+}
+function extractSpecText($) {
+  SKIP_SELECTORS.forEach((selector) => {
+    $(selector).remove();
+  });
+  const textParts = [];
+  for (const selector of SPEC_SELECTORS) {
+    const elements = $(selector);
+    if (elements.length > 0) {
+      elements.each((_, el) => {
+        const text = $(el).text();
+        if (text.length > 50) {
+          textParts.push(text);
+        }
+      });
+      if (textParts.join("").length > 500) {
+        break;
+      }
+    }
+  }
+  if (textParts.length === 0) {
+    const bodyText = $("body").text();
+    textParts.push(bodyText);
+  }
+  return cleanText(textParts.join("\n\n"));
+}
+function extractTables($) {
+  const tableParts = [];
+  $("table").each((_, table) => {
+    const rows = [];
+    $(table).find("tr").each((_2, tr) => {
+      const cells = [];
+      $(tr).find("th, td").each((_3, cell) => {
+        cells.push($(cell).text().trim());
+      });
+      if (cells.length > 0) {
+        rows.push(cells.join(": "));
+      }
+    });
+    if (rows.length > 0) {
+      tableParts.push(rows.join("\n"));
+    }
+  });
+  return tableParts.join("\n\n");
+}
+async function scrapeProductPage(url) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    const error = {
+      code: "url.invalid",
+      message: "That URL doesn't look valid.",
+      suggestion: "Include the full https:// address."
+    };
+    throw error;
+  }
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    const error = {
+      code: "url.protocol",
+      message: "Only HTTP and HTTPS URLs are supported.",
+      suggestion: "Use an https:// product page."
+    };
+    throw error;
+  }
+  const host = parsedUrl.hostname.toLowerCase();
+  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1", "10.", "192.168.", "172."];
+  if (blocked.some((b) => host.includes(b)) || host.endsWith(".local") || host.endsWith(".internal")) {
+    const error = {
+      code: "url.blocked",
+      message: "Local or internal URLs are not allowed.",
+      suggestion: "Use a public manufacturer product page."
+    };
+    throw error;
+  }
+  try {
+    const fetchResult = await retryFetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    });
+    if (!fetchResult.success) {
+      const error = fetchResult.error;
+      let errorMsg;
+      const status = error?.status;
+      switch (status) {
+        case 403:
+          errorMsg = {
+            code: "url.blocked",
+            message: "This site blocked automated access.",
+            suggestion: "Try another product page or paste specs directly."
+          };
+          break;
+        case 404:
+          errorMsg = {
+            code: "url.not_found",
+            message: "The product page was not found.",
+            suggestion: "Check the URL or try a different product page."
+          };
+          break;
+        case 429:
+          errorMsg = {
+            code: "url.rate_limited",
+            message: "Too many requests to this site.",
+            suggestion: "Wait a few minutes and try again."
+          };
+          break;
+        default:
+          errorMsg = {
+            code: "url.fetch_failed",
+            message: `Failed to fetch page: ${error.message}`,
+            suggestion: "Check the URL or try again later."
+          };
+      }
+      throw errorMsg;
+    }
+    const response = fetchResult.data;
+    if (!response.ok) {
+      let errorMsg;
+      switch (response.status) {
+        case 403:
+          errorMsg = {
+            code: "url.blocked",
+            message: "This site blocked automated access.",
+            suggestion: "Try another product page or paste specs directly."
+          };
+          break;
+        case 404:
+          errorMsg = {
+            code: "url.not_found",
+            message: "The product page was not found.",
+            suggestion: "Check the URL or try a different product page."
+          };
+          break;
+        case 429:
+          errorMsg = {
+            code: "url.rate_limited",
+            message: "Too many requests to this site.",
+            suggestion: "Wait a few minutes and try again."
+          };
+          break;
+        default:
+          errorMsg = {
+            code: "url.server_error",
+            message: `Manufacturer site error: ${response.status}`,
+            suggestion: "Try again later or use a different source."
+          };
+      }
+      throw errorMsg;
+    }
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const title = $("title").text().trim() || $("h1").first().text().trim() || "Unknown Product";
+    const tableText = extractTables($);
+    const specText = extractSpecText($);
+    const combinedText = [tableText, specText].filter((t) => t.length > 0).join("\n\n---\n\n");
+    if (!combinedText.trim()) {
+      const error = {
+        code: "url.no_content",
+        message: "No content could be extracted from this page.",
+        suggestion: "Try a different product page or paste specs directly."
+      };
+      throw error;
+    }
+    const maxLength = 3e4;
+    const text = combinedText.length > maxLength ? combinedText.slice(0, maxLength) + "\n\n[Content truncated...]" : combinedText;
+    return {
+      title,
+      text,
+      url,
+      manufacturer: detectManufacturer(url)
+    };
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error) {
+      throw error;
+    }
+    console.error("URL scraping failed:", error);
+    const userError = {
+      code: "url.scraping_failed",
+      message: "Failed to scrape the URL.",
+      suggestion: "Check the URL or try again later."
+    };
+    throw userError;
+  }
+}
+
+function validateUrlInput(raw) {
+  const value = raw?.trim();
+  if (!value) return { ok: false, error: { code: "url.empty", message: "URL is required.", suggestion: "Paste a full https:// product page URL." } };
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return { ok: false, error: { code: "url.invalid", message: "That URL doesn't look valid.", suggestion: "Include https:// at the beginning." } };
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return { ok: false, error: { code: "url.protocol", message: "Only HTTP/HTTPS URLs are supported.", suggestion: "Use an https:// product page." } };
+  }
+  const host = parsed.hostname.toLowerCase();
+  const blocked = ["localhost", "127.0.0.1", "0.0.0.0", "::1"];
+  if (blocked.includes(host) || host.endsWith(".local") || host.endsWith(".internal")) {
+    return { ok: false, error: { code: "url.blocked", message: "Local or internal URLs are not allowed.", suggestion: "Use a public manufacturer product page." } };
+  }
+  return { ok: true, value: parsed.toString() };
+}
+async function validatePdfFile(file) {
+  if (!file || file.size === 0) return { ok: false, error: { code: "pdf.missing", message: "No PDF file provided.", suggestion: "Upload a PDF spec sheet or brochure." } };
+  if (file.size > 2e7) return { ok: false, error: { code: "pdf.too_large", message: "PDF is larger than 20MB.", suggestion: "Export a smaller PDF or split it into parts." } };
+  if (file.type && file.type !== "application/pdf") {
+    return { ok: false, error: { code: "pdf.type", message: "Only PDF files are supported.", suggestion: "Upload a .pdf file." } };
+  }
+  const buf = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const signature = String.fromCharCode(...buf);
+  if (signature !== "%PDF") {
+    return { ok: false, error: { code: "pdf.invalid", message: "This file doesn't look like a valid PDF.", suggestion: "Re‑export or download the PDF again." } };
+  }
+  return { ok: true, file };
+}
+function validateTextInput(text) {
+  const value = text?.trim() || "";
+  if (value.length < 50) {
+    return { ok: false, error: { code: "text.short", message: "Text is too short to extract reliable specs.", suggestion: "Paste the full spec sheet or at least a few paragraphs." } };
+  }
+  if (value.length > 6e4) {
+    return { ok: false, error: { code: "text.long", message: "Text is too long to process in one pass.", suggestion: "Trim to the spec section only or split into parts." } };
+  }
+  return { ok: true, value };
+}
+function validateContentPayload(raw) {
+  if (!raw || typeof raw !== "object") {
+    return { ok: false, error: { code: "content.invalid", message: "Content payload is invalid.", suggestion: "Re‑extract content before saving." } };
+  }
+  const c = raw;
+  const okArray = (v) => Array.isArray(v);
+  if (!okArray(c.specs) || !okArray(c.highlights) || !okArray(c.included) || !okArray(c.featured)) {
+    return { ok: false, error: { code: "content.shape", message: "Extracted content is incomplete.", suggestion: "Re‑extract content and try saving again." } };
+  }
+  return { ok: true, value: c };
+}
+
+function asUserError(err, fallback) {
+  if (typeof err === "object" && err && "code" in err && "message" in err) {
+    return err;
+  }
+  return fallback;
+}
+
 const PRODUCTS_QUERY = `#graphql
   query ProductsQuery($query: String, $first: Int!) {
     products(first: $first, query: $query) {
@@ -2038,7 +1324,7 @@ const METAFIELDS_SET_MUTATION = `#graphql
     }
   }
 `;
-const loader$4 = async ({ request }) => {
+const loader$5 = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const url = new URL(request.url);
   const searchQuery = url.searchParams.get("search") || "";
@@ -2844,12 +2130,12 @@ function ErrorBoundary$1() {
   return /* @__PURE__ */ jsx(Page, { title: "Product Bridge", children: /* @__PURE__ */ jsx(Banner, { tone: "critical", title: message, children: suggestion }) });
 }
 
-const route3 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   ErrorBoundary: ErrorBoundary$1,
   action: action$2,
   default: AppIndex,
-  loader: loader$4
+  loader: loader$5
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const Polaris = {
@@ -3262,7 +2548,7 @@ const enTranslations = {
 	Polaris: Polaris
 };
 
-const loader$3 = async ({ request }) => {
+const loader$4 = async ({ request }) => {
   const url = new URL(request.url);
   const shopError = url.searchParams.get("shop-error");
   return json({ shopError });
@@ -3295,11 +2581,11 @@ function Auth() {
   ] }) }) }) }) });
 }
 
-const route4 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route3 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   action: action$1,
   default: Auth,
-  loader: loader$3
+  loader: loader$4
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const action = async ({ request }) => {
@@ -3319,9 +2605,22 @@ const action = async ({ request }) => {
   throw new Response();
 };
 
-const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route4 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   action
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const loader$3 = async () => {
+  return json({ status: "ok" }, { status: 200 });
+};
+function HealthCheck() {
+  return /* @__PURE__ */ jsx("div", { children: "OK" });
+}
+
+const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: HealthCheck,
+  loader: loader$3
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const loader$2 = async ({ request }) => {
@@ -3373,7 +2672,7 @@ const route8 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   loader
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','imports':['/assets/components-DKwNRbqV.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-B4Pd06ft.js','imports':['/assets/components-DKwNRbqV.js'],'css':['/assets/root-DgT1QTbr.css']},'routes/app._index.original':{'id':'routes/app._index.original','parentId':'routes/app._index','path':'original','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index.original-DeR5N7ps.js','imports':['/assets/components-DKwNRbqV.js','/assets/SearchIcon.svg-Pl61KX6Q.js','/assets/Page-P-8IetFp.js','/assets/context-BRhAIWmx.js','/assets/FormLayout-CLAstZ-x.js'],'css':[]},'routes/api.extract':{'id':'routes/api.extract','parentId':'root','path':'api/extract','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.extract-l0sNRNKZ.js','imports':[],'css':[]},'routes/app._index':{'id':'routes/app._index','parentId':'routes/app','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index-DyWajh7p.js','imports':['/assets/components-DKwNRbqV.js','/assets/Page-P-8IetFp.js','/assets/context-BRhAIWmx.js','/assets/SearchIcon.svg-Pl61KX6Q.js'],'css':[]},'routes/auth.login':{'id':'routes/auth.login','parentId':'root','path':'auth/login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/route-DACMr74n.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/Page-P-8IetFp.js','/assets/FormLayout-CLAstZ-x.js','/assets/context-BRhAIWmx.js'],'css':[]},'routes/webhooks':{'id':'routes/webhooks','parentId':'root','path':'webhooks','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webhooks-l0sNRNKZ.js','imports':[],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-l0sNRNKZ.js','imports':[],'css':[]},'routes/auth.$':{'id':'routes/auth.$','parentId':'root','path':'auth/*','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/auth._-l0sNRNKZ.js','imports':[],'css':[]},'routes/app':{'id':'routes/app','parentId':'root','path':'app','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app-1Wf0Ek65.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/context-BRhAIWmx.js'],'css':[]}},'url':'/assets/manifest-9defcba3.js','version':'9defcba3'};
+const serverManifest = {'entry':{'module':'/assets/entry.client-B60DqcyN.js','imports':['/assets/jsx-runtime-BMrMXMSG.js','/assets/components-BxgdI89b.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-Cm7FRdMP.js','imports':['/assets/jsx-runtime-BMrMXMSG.js','/assets/components-BxgdI89b.js'],'css':['/assets/root-DgT1QTbr.css']},'routes/api.extract':{'id':'routes/api.extract','parentId':'root','path':'api/extract','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.extract-l0sNRNKZ.js','imports':[],'css':[]},'routes/app._index':{'id':'routes/app._index','parentId':'routes/app','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index-ZrV7XABp.js','imports':['/assets/jsx-runtime-BMrMXMSG.js','/assets/Page-DPNCAlvE.js','/assets/context-7sNvKXTa.js','/assets/components-BxgdI89b.js'],'css':[]},'routes/auth.login':{'id':'routes/auth.login','parentId':'root','path':'auth/login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/route-B-jd5oTO.js','imports':['/assets/jsx-runtime-BMrMXMSG.js','/assets/en-DDEZmg6k.js','/assets/components-BxgdI89b.js','/assets/Page-DPNCAlvE.js','/assets/context-7sNvKXTa.js'],'css':[]},'routes/webhooks':{'id':'routes/webhooks','parentId':'root','path':'webhooks','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webhooks-l0sNRNKZ.js','imports':[],'css':[]},'routes/healthz':{'id':'routes/healthz','parentId':'root','path':'healthz','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/healthz-DuSwP-9t.js','imports':['/assets/jsx-runtime-BMrMXMSG.js'],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-l0sNRNKZ.js','imports':[],'css':[]},'routes/auth.$':{'id':'routes/auth.$','parentId':'root','path':'auth/*','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/auth._-l0sNRNKZ.js','imports':[],'css':[]},'routes/app':{'id':'routes/app','parentId':'root','path':'app','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app-DKce_1J3.js','imports':['/assets/jsx-runtime-BMrMXMSG.js','/assets/en-DDEZmg6k.js','/assets/components-BxgdI89b.js','/assets/context-7sNvKXTa.js'],'css':[]}},'url':'/assets/manifest-a23499e7.js','version':'a23499e7'};
 
 /**
        * `mode` is only relevant for the old Remix compiler but
@@ -3395,21 +2694,13 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','im
           caseSensitive: undefined,
           module: route0
         },
-  "routes/app._index.original": {
-          id: "routes/app._index.original",
-          parentId: "routes/app._index",
-          path: "original",
-          index: undefined,
-          caseSensitive: undefined,
-          module: route1
-        },
   "routes/api.extract": {
           id: "routes/api.extract",
           parentId: "root",
           path: "api/extract",
           index: undefined,
           caseSensitive: undefined,
-          module: route2
+          module: route1
         },
   "routes/app._index": {
           id: "routes/app._index",
@@ -3417,7 +2708,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','im
           path: undefined,
           index: true,
           caseSensitive: undefined,
-          module: route3
+          module: route2
         },
   "routes/auth.login": {
           id: "routes/auth.login",
@@ -3425,12 +2716,20 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','im
           path: "auth/login",
           index: undefined,
           caseSensitive: undefined,
-          module: route4
+          module: route3
         },
   "routes/webhooks": {
           id: "routes/webhooks",
           parentId: "root",
           path: "webhooks",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route4
+        },
+  "routes/healthz": {
+          id: "routes/healthz",
+          parentId: "root",
+          path: "healthz",
           index: undefined,
           caseSensitive: undefined,
           module: route5
