@@ -14,7 +14,7 @@ import {
   Thumbnail,
   EmptyState,
 } from "@shopify/polaris";
-import { ImportIcon, ProductsIcon, SettingsIcon, CheckIcon } from "@shopify/polaris-icons";
+import { ImportIcon, ProductIcon, SettingsIcon, CheckIcon } from "@shopify/polaris-icons";
 
 import { authenticate } from "../shopify.server";
 
@@ -144,7 +144,7 @@ export default function Dashboard() {
                   See enhanced products.
                 </Text>
                 <Link to="/app/products" style={{ textDecoration: "none" }}>
-                  <Button variant="secondary" icon={ProductsIcon}>
+                  <Button variant="secondary" icon={ProductIcon}>
                     View Products
                   </Button>
                 </Link>

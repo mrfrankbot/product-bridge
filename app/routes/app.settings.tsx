@@ -8,7 +8,7 @@ import {
   Text,
   Badge,
 } from "@shopify/polaris";
-import { StatusActiveIcon, StatusInactiveIcon } from "@shopify/polaris-icons";
+import { CheckCircleIcon, XCircleIcon } from "@shopify/polaris-icons";
 
 import { authenticate } from "../shopify.server";
 
@@ -44,7 +44,7 @@ export default function SettingsPage() {
               </BlockStack>
               <Badge
                 tone={openaiConfigured ? "success" : "attention"}
-                icon={openaiConfigured ? StatusActiveIcon : StatusInactiveIcon}
+                icon={openaiConfigured ? CheckCircleIcon : XCircleIcon}
               >
                 {openaiConfigured ? "Connected" : "Not configured"}
               </Badge>
