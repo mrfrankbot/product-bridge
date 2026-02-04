@@ -1,0 +1,38 @@
+{
+  "name": "product-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "shopify app dev",
+    "build": "remix vite:build",
+    "start": "remix-serve build/server/index.js",
+    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@remix-run/node": "^2.8.0",
+    "@remix-run/react": "^2.8.0",
+    "@remix-run/serve": "^2.8.0",
+    "@shopify/app-bridge-react": "^4.0.0",
+    "@shopify/polaris": "^12.0.0",
+    "@shopify/polaris-icons": "^9.0.0",
+    "@shopify/shopify-app-remix": "^3.0.0",
+    "@shopify/shopify-app-session-storage-memory": "^4.0.0",
+    "cheerio": "^1.0.0",
+    "isbot": "^5.0.0",
+    "openai": "^4.0.0",
+    "pdf-parse": "^1.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@remix-run/dev": "^2.8.0",
+    "@shopify/cli": "^3.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vite-tsconfig-paths": "^4.0.0"
+  }
+}

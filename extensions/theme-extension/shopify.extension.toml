@@ -1,0 +1,23 @@
+api_version = "2024-10"
+
+[[extensions]]
+uid = "78acaa64-fb0e-579e-dc47-29d5814799a45e61b45a"
+type = "theme"
+name = "Product Bridge"
+handle = "product-bridge"
+
+[[extensions.targeting]]
+module = "./blocks/product-specs.liquid"
+target = "section"
+
+[[extensions.targeting]]
+module = "./blocks/product-highlights.liquid"
+target = "section"
+
+[[extensions.targeting]]
+module = "./blocks/product-included.liquid"
+target = "section"
+
+[[extensions.targeting]]
+module = "./blocks/product-featured-specs.liquid"
+target = "section"

@@ -1,0 +1,548 @@
+{% comment %}
+  What's Included - Premium Edition
+  Professional "What's in the Box" with clean styling and thumbnail support
+  Displays box contents from product_bridge.included metafield
+  Schema: [{title: string, link?: string, image?: string}]
+{% endcomment %}
+
+{% assign included_json = product.metafields.product_bridge.included.value %}
+
+{% if included_json != blank %}
+  <div class="pb-included" style="
+    --pb-heading-color: {{ block.settings.heading_color }};
+    --pb-text-color: {{ block.settings.text_color }};
+    --pb-icon-color: {{ block.settings.icon_color }};
+    --pb-link-color: {{ block.settings.link_color }};
+    --pb-bg-color: {{ block.settings.bg_color }};
+    --pb-border-color: {{ block.settings.border_color }};
+    --pb-accent-color: {{ block.settings.accent_color }};
+    --pb-card-hover: {{ block.settings.card_hover }};
+  ">
+    <div class="pb-included__header">
+      {% if block.settings.show_box_icon %}
+        <div class="pb-included__box-icon">
+          <svg viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="12" y1="22.08" x2="12" y2="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      {% endif %}
+      {% if block.settings.heading != blank %}
+        <div class="pb-included__heading-wrap">
+          <h2 class="pb-included__heading">{{ block.settings.heading }}</h2>
+          <span class="pb-included__count">{{ included_json.size }} items</span>
+        </div>
+      {% endif %}
+    </div>
+
+    {% assign items = included_json %}
+    
+    <div class="pb-included__container">
+      <ul class="pb-included__list">
+        {% for item in items %}
+          <li class="pb-included__item">
+            {% if item.image != blank %}
+              <div class="pb-included__thumb">
+                <img src="{{ item.image }}" alt="{{ item.title }}" loading="lazy" width="48" height="48">
+              </div>
+            {% else %}
+              <div class="pb-included__icon-wrap pb-included__icon-wrap--{{ block.settings.icon_style }}">
+                {% case block.settings.icon_style %}
+                  {% when 'box' %}
+                    <svg class="pb-included__icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <polyline points="3.27 6.96 12 12.01 20.73 6.96" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <line x1="12" y1="22.08" x2="12" y2="12" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  {% when 'check-box' %}
+                    <svg class="pb-included__icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <path d="M9 12l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  {% when 'check' %}
+                    <svg class="pb-included__icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 12l5 5L19 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  {% when 'dot' %}
+                    <span class="pb-included__dot"></span>
+                  {% when 'number' %}
+                    <span class="pb-included__number">{{ forloop.index }}</span>
+                  {% when 'circle-check' %}
+                    <svg class="pb-included__icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <path d="M8 12l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                {% endcase %}
+              </div>
+            {% endif %}
+            
+            <div class="pb-included__content">
+              {% if item.link != blank %}
+                <a href="{{ item.link }}" class="pb-included__link">
+                  {{ item.title }}
+                  <svg class="pb-included__link-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <path d="M7 17l10-10M7 7h10v10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </a>
+              {% else %}
+                <span class="pb-included__text">{{ item.title }}</span>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    
+    {% if block.settings.show_footer %}
+      <div class="pb-included__footer">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>Contents may vary by region. Check product packaging for exact contents.</span>
+      </div>
+    {% endif %}
+  </div>
+{% elsif request.design_mode %}
+  <div class="pb-included pb-included--placeholder">
+    <p class="pb-included__empty">What's Included will display here when data is available.</p>
+  </div>
+{% endif %}
+
+<style>
+  .pb-included {
+    font-family: inherit;
+    margin: {{ block.settings.margin_top }}px 0 {{ block.settings.margin_bottom }}px;
+  }
+  
+  .pb-included__header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  
+  .pb-included__box-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--pb-accent-color) 0%, color-mix(in srgb, var(--pb-accent-color) 80%, #000) 100%);
+    color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--pb-accent-color) 30%, transparent);
+  }
+  
+  .pb-included__heading-wrap {
+    flex: 1;
+  }
+  
+  .pb-included__heading {
+    font-size: {{ block.settings.heading_size }}px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--pb-heading-color);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  
+  .pb-included__count {
+    font-size: 0.8125rem;
+    color: color-mix(in srgb, var(--pb-text-color) 60%, transparent);
+    font-weight: 500;
+  }
+  
+  .pb-included__container {
+    background: var(--pb-bg-color);
+    border: 1px solid var(--pb-border-color);
+    border-radius: {{ block.settings.border_radius }}px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  
+  .pb-included__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    {% if block.settings.columns == 'auto' %}
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    {% elsif block.settings.columns == '2' %}
+      grid-template-columns: repeat(2, 1fr);
+    {% else %}
+      grid-template-columns: 1fr;
+    {% endif %}
+  }
+  
+  .pb-included__item {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 1rem 1.25rem;
+    color: var(--pb-text-color);
+    font-size: {{ block.settings.text_size }}px;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid var(--pb-border-color);
+    position: relative;
+  }
+  
+  {% if block.settings.columns != '1' %}
+    .pb-included__item:nth-child(odd) {
+      border-right: 1px solid var(--pb-border-color);
+    }
+  {% endif %}
+  
+  .pb-included__item:hover {
+    background: var(--pb-card-hover);
+  }
+  
+  .pb-included__item:hover::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--pb-accent-color);
+  }
+  
+  /* Remove border from last row */
+  {% if block.settings.columns == '2' %}
+    .pb-included__item:nth-last-child(-n+2) {
+      border-bottom: none;
+    }
+  {% elsif block.settings.columns == '1' %}
+    .pb-included__item:last-child {
+      border-bottom: none;
+    }
+  {% else %}
+    .pb-included__item:last-child {
+      border-bottom: none;
+    }
+  {% endif %}
+  
+  .pb-included__thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f5f5f5;
+    flex-shrink: 0;
+    border: 1px solid var(--pb-border-color);
+  }
+  
+  .pb-included__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .pb-included__icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  .pb-included__icon-wrap--box,
+  .pb-included__icon-wrap--check-box,
+  .pb-included__icon-wrap--circle-check {
+    width: 32px;
+    height: 32px;
+    background: color-mix(in srgb, var(--pb-icon-color) 12%, transparent);
+    border-radius: 8px;
+    color: var(--pb-icon-color);
+  }
+  
+  .pb-included__icon-wrap--check {
+    width: 32px;
+    height: 32px;
+    color: var(--pb-icon-color);
+  }
+  
+  .pb-included__icon-wrap--dot {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .pb-included__icon-wrap--number {
+    width: 32px;
+    height: 32px;
+    background: var(--pb-icon-color);
+    border-radius: 50%;
+  }
+  
+  .pb-included__icon {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .pb-included__dot {
+    width: 10px;
+    height: 10px;
+    background: var(--pb-icon-color);
+    border-radius: 50%;
+  }
+  
+  .pb-included__number {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  
+  .pb-included__content {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .pb-included__text {
+    font-weight: 500;
+    display: block;
+  }
+  
+  .pb-included__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--pb-link-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+  
+  .pb-included__link:hover {
+    color: color-mix(in srgb, var(--pb-link-color) 80%, #000);
+    text-decoration: underline;
+  }
+  
+  .pb-included__link-icon {
+    opacity: 0.5;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  
+  .pb-included__link:hover .pb-included__link-icon {
+    opacity: 1;
+    transform: translate(2px, -2px);
+  }
+  
+  .pb-included__footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.875rem 1.25rem;
+    background: color-mix(in srgb, var(--pb-bg-color) 80%, var(--pb-border-color));
+    border-top: 1px solid var(--pb-border-color);
+    font-size: 0.75rem;
+    color: color-mix(in srgb, var(--pb-text-color) 60%, transparent);
+  }
+  
+  .pb-included__empty,
+  .pb-included--placeholder {
+    padding: 2rem;
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+  }
+  
+  @media (max-width: 640px) {
+    .pb-included__list {
+      grid-template-columns: 1fr;
+    }
+    
+    .pb-included__item {
+      border-right: none !important;
+    }
+    
+    .pb-included__item:last-child {
+      border-bottom: none;
+    }
+    
+    .pb-included__header {
+      gap: 0.75rem;
+    }
+    
+    .pb-included__box-icon {
+      width: 48px;
+      height: 48px;
+    }
+    
+    .pb-included__box-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+    
+    .pb-included__count {
+      display: block;
+      margin-top: 0.125rem;
+    }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "What's Included",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "What's In The Box"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_box_icon",
+      "label": "Show decorative box icon",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_footer",
+      "label": "Show footer disclaimer",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "columns",
+      "label": "Columns",
+      "options": [
+        { "value": "1", "label": "1 column" },
+        { "value": "2", "label": "2 columns" },
+        { "value": "auto", "label": "Auto-fit" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select",
+      "id": "icon_style",
+      "label": "Icon style",
+      "options": [
+        { "value": "box", "label": "Box" },
+        { "value": "check-box", "label": "Checkbox" },
+        { "value": "check", "label": "Checkmark" },
+        { "value": "dot", "label": "Dot" },
+        { "value": "number", "label": "Numbered" },
+        { "value": "circle-check", "label": "Circle check" }
+      ],
+      "default": "check-box"
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "min": 16,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "label": "Heading size",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "text_size",
+      "min": 14,
+      "max": 18,
+      "step": 1,
+      "unit": "px",
+      "label": "Text size",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "min": 0,
+      "max": 20,
+      "step": 2,
+      "unit": "px",
+      "label": "Border radius",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "min": 0,
+      "max": 60,
+      "step": 4,
+      "unit": "px",
+      "label": "Top margin",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "min": 0,
+      "max": 60,
+      "step": 4,
+      "unit": "px",
+      "label": "Bottom margin",
+      "default": 20
+    },
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "Heading color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#333333"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "Icon color",
+      "default": "#0066cc"
+    },
+    {
+      "type": "color",
+      "id": "link_color",
+      "label": "Link color",
+      "default": "#0066cc"
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "Background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Border color",
+      "default": "#e5e7eb"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color (header icon)",
+      "default": "#0066cc"
+    },
+    {
+      "type": "color",
+      "id": "card_hover",
+      "label": "Item hover background",
+      "default": "#f8fafc"
+    }
+  ]
+}
+{% endschema %}

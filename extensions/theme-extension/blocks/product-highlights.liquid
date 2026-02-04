@@ -1,0 +1,482 @@
+{% comment %}
+  Product Highlights - Premium Edition
+  Premium bullet styling with cards, animations, custom icons
+  Displays bullet points from product_bridge.highlights metafield
+  Schema: string[] (array of highlight strings)
+{% endcomment %}
+
+{% assign highlights_json = product.metafields.product_bridge.highlights.value %}
+
+{% if highlights_json != blank %}
+  <div class="pb-highlights" style="
+    --pb-heading-color: {{ block.settings.heading_color }};
+    --pb-text-color: {{ block.settings.text_color }};
+    --pb-icon-color: {{ block.settings.icon_color }};
+    --pb-icon-bg: {{ block.settings.icon_bg }};
+    --pb-card-bg: {{ block.settings.card_bg }};
+    --pb-card-border: {{ block.settings.card_border }};
+    --pb-divider-color: {{ block.settings.divider_color }};
+    --pb-accent-color: {{ block.settings.accent_color }};
+  ">
+    {% if block.settings.heading != blank %}
+      <h2 class="pb-highlights__heading">
+        {% if block.settings.show_heading_icon %}
+          <svg class="pb-highlights__heading-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <path d="M9 11l3 3L22 4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {% endif %}
+        {{ block.settings.heading }}
+        {% if block.settings.show_count %}
+          <span class="pb-highlights__count">{{ highlights_json.size }} features</span>
+        {% endif %}
+      </h2>
+    {% endif %}
+
+    {% assign highlights = highlights_json %}
+    
+    <ul class="pb-highlights__list pb-highlights__list--{{ block.settings.layout }}">
+      {% for highlight in highlights %}
+        <li class="pb-highlights__item {% if block.settings.enable_animation %}pb-highlights__item--animated{% endif %}" style="--animation-delay: {{ forloop.index | times: 100 }}ms;">
+          <div class="pb-highlights__icon-wrap pb-highlights__icon-wrap--{{ block.settings.icon_style }}">
+            {% case block.settings.icon_style %}
+              {% when 'checkmark' %}
+                <svg class="pb-highlights__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12l5 5L19 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {% when 'check-circle' %}
+                <svg class="pb-highlights__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <path d="M8 12l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {% when 'star' %}
+                <svg class="pb-highlights__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/>
+                </svg>
+              {% when 'bullet' %}
+                <span class="pb-highlights__bullet"></span>
+              {% when 'arrow' %}
+                <svg class="pb-highlights__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {% when 'dot-circle' %}
+                <svg class="pb-highlights__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                </svg>
+              {% when 'plus' %}
+                <svg class="pb-highlights__icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+              {% when 'number' %}
+                <span class="pb-highlights__number">{{ forloop.index }}</span>
+            {% endcase %}
+          </div>
+          <span class="pb-highlights__text">{{ highlight }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% elsif request.design_mode %}
+  <div class="pb-highlights pb-highlights--placeholder">
+    <p class="pb-highlights__empty">Product Highlights will display here when data is available.</p>
+  </div>
+{% endif %}
+
+<style>
+  .pb-highlights {
+    font-family: inherit;
+    margin: {{ block.settings.margin_top }}px 0 {{ block.settings.margin_bottom }}px;
+  }
+  
+  .pb-highlights__heading {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: {{ block.settings.heading_size }}px;
+    font-weight: 700;
+    margin: 0 0 1.25rem;
+    color: var(--pb-heading-color);
+    letter-spacing: -0.02em;
+  }
+  
+  .pb-highlights__heading-icon {
+    color: var(--pb-accent-color);
+  }
+  
+  .pb-highlights__count {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--pb-text-color) 50%, transparent);
+    background: color-mix(in srgb, var(--pb-card-border) 60%, transparent);
+    padding: 0.25rem 0.625rem;
+    border-radius: 100px;
+    margin-left: auto;
+  }
+  
+  .pb-highlights__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  /* Grid layout */
+  .pb-highlights__list--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  
+  /* List layout */
+  .pb-highlights__list--list {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .pb-highlights__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+    color: var(--pb-text-color);
+    font-size: {{ block.settings.text_size }}px;
+    line-height: 1.6;
+    transition: all 0.25s ease;
+  }
+  
+  /* Grid item styling (cards) */
+  .pb-highlights__list--grid .pb-highlights__item {
+    padding: 1.25rem;
+    background: var(--pb-card-bg);
+    border: 1px solid var(--pb-card-border);
+    border-radius: {{ block.settings.border_radius }}px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  
+  .pb-highlights__list--grid .pb-highlights__item:hover {
+    border-color: var(--pb-accent-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+  
+  /* List item styling */
+  .pb-highlights__list--list .pb-highlights__item {
+    padding: 1rem 0;
+    {% if block.settings.show_dividers %}
+      border-bottom: 1px solid var(--pb-divider-color);
+    {% endif %}
+  }
+  
+  .pb-highlights__list--list .pb-highlights__item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  
+  .pb-highlights__list--list .pb-highlights__item:first-child {
+    padding-top: 0;
+  }
+  
+  .pb-highlights__list--list .pb-highlights__item:hover {
+    padding-left: 0.5rem;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--pb-accent-color) 5%, transparent) 0%, transparent 100%);
+  }
+  
+  /* Animation */
+  .pb-highlights__item--animated {
+    animation: pb-fadeSlideIn 0.5s ease forwards;
+    animation-delay: var(--animation-delay);
+    opacity: 0;
+  }
+  
+  @keyframes pb-fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Icon wrapper variations */
+  .pb-highlights__icon-wrap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 2px;
+  }
+  
+  .pb-highlights__icon-wrap--checkmark,
+  .pb-highlights__icon-wrap--check-circle {
+    width: 24px;
+    height: 24px;
+    background: var(--pb-icon-bg);
+    color: var(--pb-icon-color);
+    border-radius: 50%;
+  }
+  
+  .pb-highlights__icon-wrap--star {
+    width: 24px;
+    height: 24px;
+    color: var(--pb-icon-bg);
+  }
+  
+  .pb-highlights__icon-wrap--bullet {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .pb-highlights__icon-wrap--arrow,
+  .pb-highlights__icon-wrap--plus {
+    width: 24px;
+    height: 24px;
+    color: var(--pb-icon-bg);
+  }
+  
+  .pb-highlights__icon-wrap--dot-circle {
+    width: 24px;
+    height: 24px;
+    color: var(--pb-icon-bg);
+  }
+  
+  .pb-highlights__icon-wrap--number {
+    width: 28px;
+    height: 28px;
+    background: var(--pb-icon-bg);
+    border-radius: 50%;
+  }
+  
+  .pb-highlights__icon {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .pb-highlights__icon-wrap--star .pb-highlights__icon,
+  .pb-highlights__icon-wrap--arrow .pb-highlights__icon,
+  .pb-highlights__icon-wrap--plus .pb-highlights__icon,
+  .pb-highlights__icon-wrap--dot-circle .pb-highlights__icon {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .pb-highlights__bullet {
+    width: 10px;
+    height: 10px;
+    background: var(--pb-icon-bg);
+    border-radius: 50%;
+  }
+  
+  .pb-highlights__number {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--pb-icon-color);
+  }
+  
+  .pb-highlights__text {
+    flex: 1;
+    font-weight: 450;
+  }
+  
+  .pb-highlights__empty,
+  .pb-highlights--placeholder {
+    padding: 2rem;
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+  }
+  
+  @media (max-width: 640px) {
+    .pb-highlights__list--grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .pb-highlights__list--grid .pb-highlights__item {
+      padding: 1rem;
+    }
+    
+    .pb-highlights__count {
+      display: none;
+    }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Product Highlights",
+  "target": "section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Key Features"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_heading_icon",
+      "label": "Show heading icon",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_count",
+      "label": "Show feature count",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "options": [
+        { "value": "list", "label": "List" },
+        { "value": "grid", "label": "Grid (cards)" }
+      ],
+      "default": "list"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_dividers",
+      "label": "Show dividers (list layout)",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_animation",
+      "label": "Enable entrance animation",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "icon_style",
+      "label": "Icon style",
+      "options": [
+        { "value": "checkmark", "label": "Checkmark (filled circle)" },
+        { "value": "check-circle", "label": "Checkmark (outline circle)" },
+        { "value": "star", "label": "Star" },
+        { "value": "bullet", "label": "Bullet" },
+        { "value": "arrow", "label": "Arrow" },
+        { "value": "dot-circle", "label": "Dot circle" },
+        { "value": "plus", "label": "Plus" },
+        { "value": "number", "label": "Numbered" }
+      ],
+      "default": "checkmark"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "min": 0,
+      "max": 20,
+      "step": 2,
+      "unit": "px",
+      "label": "Card border radius",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "min": 16,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "label": "Heading size",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "text_size",
+      "min": 14,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "label": "Text size",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "min": 0,
+      "max": 60,
+      "step": 4,
+      "unit": "px",
+      "label": "Top margin",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "min": 0,
+      "max": 60,
+      "step": 4,
+      "unit": "px",
+      "label": "Bottom margin",
+      "default": 20
+    },
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "Heading color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#333333"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "Icon color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "icon_bg",
+      "label": "Icon background/color",
+      "default": "#22c55e"
+    },
+    {
+      "type": "color",
+      "id": "card_bg",
+      "label": "Card background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "card_border",
+      "label": "Card border",
+      "default": "#e5e7eb"
+    },
+    {
+      "type": "color",
+      "id": "divider_color",
+      "label": "Divider color",
+      "default": "#f0f0f0"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Accent color",
+      "default": "#22c55e"
+    }
+  ]
+}
+{% endschema %}

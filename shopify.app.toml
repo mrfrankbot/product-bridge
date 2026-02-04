@@ -1,0 +1,24 @@
+# Shopify App Configuration
+# Learn more: https://shopify.dev/docs/apps/tools/cli/configuration
+
+name = "Product Bridge"
+client_id = "b3858538da509600efa38d560ca48cd7"
+application_url = "https://product-bridge.vercel.app"
+embedded = true
+
+[access_scopes]
+# Access scopes for reading/writing products (metafields included in products scope)
+scopes = "read_products,write_products"
+
+[auth]
+redirect_urls = [
+  "https://product-bridge.vercel.app/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-01"
+
+[pos]
+embedded = false
+
+[build]

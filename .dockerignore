@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Dependencies (will be rebuilt in Docker)
+node_modules
+
+# Build output (will be rebuilt in Docker)
+build
+
+# Development files
+.cache
+.env
+.shopify
+*.log
+
+# IDE
+.vscode
+.idea
+
+# Tests
+*.test.ts
+*.test.tsx
+__tests__
+
+# Docs
+*.md
+!README.md
+
+# Extensions (deployed separately via Shopify CLI)
+extensions

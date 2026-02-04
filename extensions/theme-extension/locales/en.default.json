@@ -1,0 +1,16 @@
+{
+  "product_bridge": {
+    "specs": {
+      "name": "Product Specs"
+    },
+    "highlights": {
+      "name": "Product Highlights"  
+    },
+    "featured": {
+      "name": "Featured Specs"
+    },
+    "included": {
+      "name": "What's Included"
+    }
+  }
+}
