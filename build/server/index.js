@@ -10,7 +10,6 @@ import { SearchIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon, CheckIcon, Chev
 import '@shopify/shopify-app-remix/adapters/node';
 import { shopifyApp, AppDistribution, LATEST_API_VERSION, boundary } from '@shopify/shopify-app-remix/server';
 import { MemorySessionStorage } from '@shopify/shopify-app-session-storage-memory';
-import { kv } from '@vercel/kv';
 import OpenAI from 'openai';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
@@ -159,61 +158,8 @@ const route0 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   default: App$1
 }, Symbol.toStringTag, { value: 'Module' }));
 
-class KVSessionStorage {
-  prefix = "shopify_session:";
-  async storeSession(session) {
-    try {
-      const key = this.prefix + session.id;
-      await kv.set(key, JSON.stringify(session), { ex: 86400 });
-      return true;
-    } catch (error) {
-      console.error("Failed to store session:", error);
-      return false;
-    }
-  }
-  async loadSession(id) {
-    try {
-      const key = this.prefix + id;
-      const data = await kv.get(key);
-      if (!data) return void 0;
-      const sessionData = typeof data === "string" ? JSON.parse(data) : data;
-      return sessionData;
-    } catch (error) {
-      console.error("Failed to load session:", error);
-      return void 0;
-    }
-  }
-  async deleteSession(id) {
-    try {
-      const key = this.prefix + id;
-      await kv.del(key);
-      return true;
-    } catch (error) {
-      console.error("Failed to delete session:", error);
-      return false;
-    }
-  }
-  async deleteSessions(ids) {
-    try {
-      const keys = ids.map((id) => this.prefix + id);
-      if (keys.length > 0) {
-        await kv.del(...keys);
-      }
-      return true;
-    } catch (error) {
-      console.error("Failed to delete sessions:", error);
-      return false;
-    }
-  }
-  async findSessionsByShop(shop) {
-    console.warn("findSessionsByShop not fully implemented for KV storage");
-    return [];
-  }
-}
-
-const isProduction = process.env.NODE_ENV === "production" || process.env.KV_REST_API_URL;
-const sessionStorage = isProduction ? new KVSessionStorage() : new MemorySessionStorage();
-console.log(`Using ${isProduction ? "Vercel KV" : "Memory"} session storage`);
+const sessionStorage = new MemorySessionStorage();
+console.log("Using Memory session storage");
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
