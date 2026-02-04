@@ -1,17 +1,19 @@
+modules = ["nodejs-20"]
+
 [nix]
 channel = "stable-24_05"
 
 [deployment]
-publicDir = "build"
-deploymentTarget = "static"
+run = ["npm", "run", "start"]
+build = ["npm", "install", "&&", "npm", "run", "build"]
+deploymentTarget = "cloudrun"
 
 [[ports]]
 localPort = 3000
 externalPort = 80
 
 [env]
-PATH = "/home/runner/$REPL_SLUG/.config/npm/node_global/bin:/home/runner/$REPL_SLUG/node_modules/.bin"
-npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm/node_global"
+PORT = "3000"
 
 [gitHubImport]
 requiredFiles = [".replit", "replit.nix", "package.json"]
@@ -23,15 +25,3 @@ pattern = "**/{*.js,*.jsx,*.ts,*.tsx,*.json}"
 
 [languages.javascript.languageServer]
 start = "typescript-language-server --stdio"
-
-[packager]
-language = "nodejs"
-
-[packager.features]
-enabledForHosting = false
-packageSearch = true
-guessImports = true
-
-[[ports]]
-localPort = 3000
-externalPort = 80
