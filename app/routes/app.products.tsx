@@ -21,7 +21,7 @@ interface ProductWithContent {
   id: string;
   title: string;
   handle: string;
-  updatedAt: string;
+  updatedAtLabel: string;
   featuredImage?: { url: string; altText?: string } | null;
   contentStatus: {
     hasSpecs: boolean;
@@ -61,6 +61,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const response = await admin.graphql(PRODUCTS_QUERY);
   const data = await response.json();
+  const formatDate = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  };
 
   const products: ProductWithContent[] =
     data.data?.products?.edges?.map((edge: any) => {
@@ -74,7 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         id: product.id,
         title: product.title,
         handle: product.handle,
-        updatedAt: product.updatedAt,
+        updatedAtLabel: formatDate(product.updatedAt),
         featuredImage: product.featuredImage,
         contentStatus: {
           hasSpecs: !!metafields.specs,
@@ -103,7 +115,7 @@ export default function ProductsPage() {
               resourceName={{ singular: "product", plural: "products" }}
               items={products}
               renderItem={(product) => {
-                const { id, title, handle, featuredImage, updatedAt, contentStatus } = product;
+                const { id, title, handle, featuredImage, updatedAtLabel, contentStatus } = product;
 
                 return (
                   <ResourceItem
@@ -123,7 +135,7 @@ export default function ProductsPage() {
                           {title}
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Updated {new Date(updatedAt).toLocaleDateString()}
+                          Updated {updatedAtLabel}
                         </Text>
                       </BlockStack>
                       <InlineStack gap="200">
