@@ -5,7 +5,7 @@ import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { Frame, Navigation } from "@shopify/polaris";
 import { 
   HomeIcon, 
-  ProductsIcon, 
+  ProductIcon, 
   ImportIcon, 
   SettingsIcon 
 } from "@shopify/polaris-icons";
@@ -25,7 +25,7 @@ export default function App() {
       <Navigation.Section
         items={[
           {
-            label: "Dashboard",
+            label: "Home",
             icon: HomeIcon,
             url: "/app",
             exactMatch: true,
@@ -33,12 +33,12 @@ export default function App() {
           },
           {
             label: "Products",
-            icon: ProductsIcon,
+            icon: ProductIcon,
             url: "/app/products",
             selected: location.pathname === "/app/products",
           },
           {
-            label: "Import Content",
+            label: "Import",
             icon: ImportIcon,
             url: "/app/import",
             selected: location.pathname === "/app/import",

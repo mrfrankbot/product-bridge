@@ -571,7 +571,6 @@ export default function ImportPage() {
           <Badge tone="info" icon={MagicIcon}>AI-Powered</Badge>
         </InlineStack>
       }
-      breadcrumbs={[{content: 'Dashboard', url: '/app'}]}
     >
       <BlockStack gap="500">
         {/* Progress Indicator */}
@@ -1088,7 +1087,7 @@ export function ErrorBoundary() {
   const { message, suggestion } = getErrorInfo();
 
   return (
-    <Page title="Import Content" breadcrumbs={[{content: 'Dashboard', url: '/app'}]}>
+    <Page title="Import Content">
       <Banner tone="critical" title={message}>
         {suggestion}
       </Banner>
