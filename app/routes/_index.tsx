@@ -3,7 +3,7 @@ import { useLoaderData, Link } from "@remix-run/react";
 import {
   Page,
   Layout,
-  LegacyCard,
+  Card,
   Text,
   BlockStack,
   InlineStack,
@@ -12,6 +12,7 @@ import {
   Thumbnail,
   EmptyState,
   Box,
+  DataTable,
 } from "@shopify/polaris";
 import { ImportIcon, ProductIcon, SettingsIcon, CheckIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
@@ -96,6 +97,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function Dashboard() {
   const { totalEnhanced, recentProducts } = useLoaderData<typeof loader>();
+  const specsReady = recentProducts.filter((product) => product.contentStatus.hasSpecs).length;
+  const highlightsReady = recentProducts.filter((product) => product.contentStatus.hasHighlights).length;
 
   return (
     <Page
@@ -120,28 +123,30 @@ export default function Dashboard() {
     >
       <Layout>
         <Layout.Section>
-          <LegacyCard sectioned>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text variant="headingMd" as="h2">
-                    Enhanced Products
-                  </Text>
-                  <Text variant="bodySm" tone="subdued">
-                    Products with imported specifications and highlights
-                  </Text>
-                </BlockStack>
-                <Text variant="heading2xl" as="p">
-                  {totalEnhanced}
-                </Text>
-              </InlineStack>
+          <Card padding="400">
+            <BlockStack gap="300">
+              <Text variant="headingMd" as="h2">
+                Overview
+              </Text>
+              <DataTable
+                columnContentTypes={["text", "numeric"]}
+                headings={["Metric", "Value"]}
+                rows={[
+                  ["Total products enhanced", totalEnhanced],
+                  ["Recent products with specs", specsReady],
+                  ["Recent products with highlights", highlightsReady],
+                ]}
+              />
             </BlockStack>
-          </LegacyCard>
+          </Card>
         </Layout.Section>
 
         <Layout.Section variant="oneHalf">
-          <LegacyCard title="Quick Actions" sectioned>
+          <Card padding="400">
             <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">
+                Quick actions
+              </Text>
               <Link to="/app/import" style={{ textDecoration: "none" }}>
                 <Box
                   padding="300"
@@ -185,12 +190,15 @@ export default function Dashboard() {
                 </Box>
               </Link>
             </BlockStack>
-          </LegacyCard>
+          </Card>
         </Layout.Section>
 
         <Layout.Section variant="oneHalf">
-          <LegacyCard title="What is Product Bridge?" sectioned>
+          <Card padding="400">
             <BlockStack gap="200">
+              <Text variant="headingMd" as="h2">
+                What is Product Bridge?
+              </Text>
               <Text variant="bodyMd" tone="subdued">
                 Product Bridge extracts structured specs, highlights, and included
                 items from PDFs, URLs, or raw text — then saves directly to product
@@ -201,31 +209,33 @@ export default function Dashboard() {
                 <Badge>Shopify Native</Badge>
               </InlineStack>
             </BlockStack>
-          </LegacyCard>
+          </Card>
         </Layout.Section>
 
         <Layout.Section>
-          <LegacyCard title="Recently Enhanced">
+          <Card padding="400">
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">
+                Recently enhanced
+              </Text>
             {recentProducts.length === 0 ? (
-              <LegacyCard.Section>
-                <EmptyState
-                  heading="No enhanced products yet"
-                  image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-                  action={{
-                    content: "Import your first specs",
-                    url: "/app/import",
-                  }}
-                >
-                  <p>
-                    Start by importing specs from a manufacturer PDF or product
-                    page.
-                  </p>
-                </EmptyState>
-              </LegacyCard.Section>
+              <EmptyState
+                heading="No enhanced products yet"
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                action={{
+                  content: "Import your first specs",
+                  url: "/app/import",
+                }}
+              >
+                <p>
+                  Start by importing specs from a manufacturer PDF or product
+                  page.
+                </p>
+              </EmptyState>
             ) : (
-              recentProducts.map((product) => (
-                <LegacyCard.Section key={product.id}>
-                  <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="300">
+                {recentProducts.map((product) => (
+                  <InlineStack key={product.id} align="space-between" blockAlign="center">
                     <InlineStack gap="300" blockAlign="center">
                       <Thumbnail
                         source={product.featuredImage?.url || ""}
@@ -264,10 +274,11 @@ export default function Dashboard() {
                       </Badge>
                     </InlineStack>
                   </InlineStack>
-                </LegacyCard.Section>
-              ))
+                ))}
+              </BlockStack>
             )}
-          </LegacyCard>
+            </BlockStack>
+          </Card>
         </Layout.Section>
       </Layout>
     </Page>

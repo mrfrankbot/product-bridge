@@ -2,6 +2,7 @@ import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
 import {
   Page,
+  Layout,
   Card,
   BlockStack,
   InlineStack,
@@ -12,6 +13,7 @@ import {
   ResourceItem,
   Thumbnail,
   EmptyState,
+  DataTable,
 } from "@shopify/polaris";
 import { ImportIcon, CheckIcon } from "@shopify/polaris-icons";
 
@@ -100,6 +102,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function ProductsPage() {
   const { products } = useLoaderData<typeof loader>();
+  const totalWithSpecs = products.filter((product) => product.contentStatus.hasSpecs).length;
+  const totalWithHighlights = products.filter((product) => product.contentStatus.hasHighlights).length;
 
   return (
     <Page
@@ -108,71 +112,92 @@ export default function ProductsPage() {
       primaryAction={{ content: "Import Specs", url: "/app/import", icon: ImportIcon }}
       breadcrumbs={[{ content: "Home", url: "/app" }]}
     >
-      <BlockStack gap="400">
-        <Card>
-          {products.length > 0 ? (
-            <ResourceList
-              resourceName={{ singular: "product", plural: "products" }}
-              items={products}
-              renderItem={(product) => {
-                const { id, title, handle, featuredImage, updatedAtLabel, contentStatus } = product;
+      <Layout>
+        <Layout.Section>
+          <Card padding="400">
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">
+                Coverage summary
+              </Text>
+              <DataTable
+                columnContentTypes={["text", "numeric"]}
+                headings={["Metafield coverage", "Count"]}
+                rows={[
+                  ["Products enhanced", products.length],
+                  ["Specs captured", totalWithSpecs],
+                  ["Highlights captured", totalWithHighlights],
+                ]}
+              />
+            </BlockStack>
+          </Card>
+        </Layout.Section>
 
-                return (
-                  <ResourceItem
-                    id={id}
-                    url={`/app/import?product=${handle}`}
-                    media={
-                      <Thumbnail
-                        source={featuredImage?.url || ""}
-                        alt={featuredImage?.altText || title}
-                        size="small"
-                      />
-                    }
-                  >
-                    <InlineStack align="space-between" blockAlign="center">
-                      <BlockStack gap="100">
-                        <Text as="h3" variant="bodyMd" fontWeight="semibold">
-                          {title}
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Updated {updatedAtLabel}
-                        </Text>
-                      </BlockStack>
-                      <InlineStack gap="200">
-                        <Badge
-                          tone={contentStatus.hasSpecs ? "success" : "subdued"}
-                          icon={contentStatus.hasSpecs ? CheckIcon : undefined}
-                        >
-                          Specs
-                        </Badge>
-                        <Badge
-                          tone={contentStatus.hasHighlights ? "success" : "subdued"}
-                          icon={contentStatus.hasHighlights ? CheckIcon : undefined}
-                        >
-                          Highlights
-                        </Badge>
-                        <Link to={`/app/import?product=${handle}`} style={{ textDecoration: "none" }}>
-                          <Button variant="secondary" size="slim">
-                            View
-                          </Button>
-                        </Link>
+        <Layout.Section>
+          <Card padding="400">
+            {products.length > 0 ? (
+              <ResourceList
+                resourceName={{ singular: "product", plural: "products" }}
+                items={products}
+                renderItem={(product) => {
+                  const { id, title, handle, featuredImage, updatedAtLabel, contentStatus } = product;
+
+                  return (
+                    <ResourceItem
+                      id={id}
+                      url={`/app/import?product=${handle}`}
+                      media={
+                        <Thumbnail
+                          source={featuredImage?.url || ""}
+                          alt={featuredImage?.altText || title}
+                          size="small"
+                        />
+                      }
+                    >
+                      <InlineStack align="space-between" blockAlign="center">
+                        <BlockStack gap="100">
+                          <Text as="h3" variant="bodyMd" fontWeight="semibold">
+                            {title}
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Updated {updatedAtLabel}
+                          </Text>
+                        </BlockStack>
+                        <InlineStack gap="200">
+                          <Badge
+                            tone={contentStatus.hasSpecs ? "success" : "subdued"}
+                            icon={contentStatus.hasSpecs ? CheckIcon : undefined}
+                          >
+                            Specs
+                          </Badge>
+                          <Badge
+                            tone={contentStatus.hasHighlights ? "success" : "subdued"}
+                            icon={contentStatus.hasHighlights ? CheckIcon : undefined}
+                          >
+                            Highlights
+                          </Badge>
+                          <Link to={`/app/import?product=${handle}`} style={{ textDecoration: "none" }}>
+                            <Button variant="secondary" size="slim">
+                              View
+                            </Button>
+                          </Link>
+                        </InlineStack>
                       </InlineStack>
-                    </InlineStack>
-                  </ResourceItem>
-                );
-              }}
-            />
-          ) : (
-            <EmptyState
-              heading="No products enhanced yet"
-              action={{ content: "Import Specs", url: "/app/import" }}
-              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
-            >
-              <p>Start by importing specs for your first product.</p>
-            </EmptyState>
-          )}
-        </Card>
-      </BlockStack>
+                    </ResourceItem>
+                  );
+                }}
+              />
+            ) : (
+              <EmptyState
+                heading="No products enhanced yet"
+                action={{ content: "Import Specs", url: "/app/import" }}
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+              >
+                <p>Start by importing specs for your first product.</p>
+              </EmptyState>
+            )}
+          </Card>
+        </Layout.Section>
+      </Layout>
     </Page>
   );
 }

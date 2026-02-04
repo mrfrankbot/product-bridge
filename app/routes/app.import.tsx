@@ -4,25 +4,22 @@ import { useLoaderData, useFetcher, useRouteError } from "@remix-run/react";
 import {
   Page,
   Card,
-  FormLayout,
   TextField,
   Button,
   Banner,
+  Layout,
   BlockStack,
   InlineStack,
   Text,
-  Thumbnail,
   Icon,
-  Autocomplete,
-  Tag,
   Box,
   Divider,
   Spinner,
   Modal,
   Badge,
-  ProgressBar,
   DropZone,
   Tabs,
+  DataTable,
 } from "@shopify/polaris";
 import { 
   SearchIcon, 
@@ -38,11 +35,6 @@ import {
   MagicIcon
 } from "@shopify/polaris-icons";
 
-// Import our enhanced components
-import { ProgressIndicator } from "../components/ProgressIndicator";
-import { StepCard, type StepState } from "../components/StepCard";
-import { MethodCard } from "../components/MethodCard";
-import { ExtractionProgress } from "../components/ExtractionProgress";
 import { ProductSelector } from "../components/ProductSelector";
 
 import { authenticate } from "../shopify.server";
@@ -52,7 +44,6 @@ import { scrapeProductPage } from "../services/url-scraper.server";
 import { validateUrlInput, validatePdfFile, validateTextInput, validateContentPayload } from "../utils/validation.server";
 import { asUserError, type UserError } from "../utils/errors.server";
 import { retryShopify } from "../utils/retry";
-import { SectionErrorBoundary } from "../components/SectionErrorBoundary";
 
 // Types
 interface Product {
@@ -409,22 +400,9 @@ export default function ImportPage() {
   const extractResult = fetcher.data as { 
     extracted?: ProductContent; 
     success?: boolean; 
-    error?: string;
+    error?: string | UserError;
     source?: SourceInfo;
   } | undefined;
-
-  // Step states
-  const getStepState = (step: number): StepState => {
-    if (step < currentStep) return 'complete';
-    if (step === currentStep) return 'active';
-    return 'inactive';
-  };
-
-  const steps = [
-    { title: "Select Product", description: "Choose which product to enhance" },
-    { title: "Import Specs", description: "Extract content with AI" },
-    { title: "Review & Save", description: "Edit and save to metafields" }
-  ];
 
   // Update content when extraction completes
   useEffect(() => {
