@@ -24,7 +24,27 @@ import {
   DropZone,
   Tabs,
 } from "@shopify/polaris";
-import { SearchIcon, EditIcon, DeleteIcon, PlusIcon, CheckIcon, ImportIcon, LinkIcon } from "@shopify/polaris-icons";
+import { 
+  SearchIcon, 
+  EditIcon, 
+  DeleteIcon, 
+  PlusIcon, 
+  CheckIcon, 
+  ImportIcon, 
+  LinkIcon,
+  DocumentTextIcon,
+  DocumentIcon,
+  GlobeIcon,
+  SparklesIcon
+} from "@shopify/polaris-icons";
+
+// Import our enhanced components
+import { ProgressIndicator } from "../components/ProgressIndicator";
+import { StepCard, type StepState } from "../components/StepCard";
+import { MethodCard } from "../components/MethodCard";
+import { ExtractionProgress } from "../components/ExtractionProgress";
+import { ProductSelector } from "../components/ProductSelector";
+
 import { authenticate } from "../shopify.server";
 import { extractProductContent, type ProductContent, type SpecGroup } from "../services/content-extractor.server";
 import { parsePdf } from "../services/pdf-parser.server";
@@ -371,14 +391,14 @@ export default function AppIndex() {
 
   // State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [searchValue, setSearchValue] = useState("");
   const [specsText, setSpecsText] = useState("");
   const [content, setContent] = useState<ProductContent | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [inputTab, setInputTab] = useState(0);
+  const [inputMethod, setInputMethod] = useState<'text' | 'pdf' | 'url'>('text');
   const [urlValue, setUrlValue] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [sourceInfo, setSourceInfo] = useState<SourceInfo | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
 
   // Computed
   const isExtracting = fetcher.state === "submitting" && 
@@ -393,6 +413,19 @@ export default function AppIndex() {
     source?: SourceInfo;
   } | undefined;
 
+  // Step states
+  const getStepState = (step: number): StepState => {
+    if (step < currentStep) return 'complete';
+    if (step === currentStep) return 'active';
+    return 'inactive';
+  };
+
+  const steps = [
+    { title: "Select Product", description: "Choose which product to enhance" },
+    { title: "Import Specs", description: "Extract content with AI" },
+    { title: "Review & Save", description: "Edit and save to metafields" }
+  ];
+
   // Update content when extraction completes
   useEffect(() => {
     if (extractResult?.extracted) {
@@ -400,8 +433,16 @@ export default function AppIndex() {
       if (extractResult.source) {
         setSourceInfo(extractResult.source);
       }
+      setCurrentStep(3); // Move to review step
     }
   }, [extractResult]);
+
+  // Update current step based on progress
+  useEffect(() => {
+    if (selectedProduct && currentStep === 1) {
+      setCurrentStep(2);
+    }
+  }, [selectedProduct]);
 
   // Handle PDF file drop/select
   const handleFileDrop = useCallback((_dropFiles: File[], acceptedFiles: File[]) => {
@@ -434,33 +475,6 @@ export default function AppIndex() {
     
     fetcher.submit(formData, { method: "post" });
   };
-
-  // Input tabs
-  const inputTabs = [
-    { id: "text", content: "📝 Paste Text" },
-    { id: "pdf", content: "📄 Upload PDF" },
-    { id: "url", content: "🔗 Scrape URL" },
-  ];
-
-  // Product search with autocomplete
-  const productOptions = products.map((p) => ({
-    value: p.id,
-    label: p.title,
-    media: p.featuredImage?.url ? (
-      <Thumbnail source={p.featuredImage.url} alt={p.featuredImage.altText || p.title} size="small" />
-    ) : undefined,
-  }));
-
-  const handleProductSelect = useCallback(
-    (selected: string[]) => {
-      const product = products.find((p) => p.id === selected[0]);
-      if (product) {
-        setSelectedProduct(product);
-        setSearchValue(product.title);
-      }
-    },
-    [products]
-  );
 
   // Content editing handlers
   const updateHighlight = (index: number, value: string) => {
@@ -549,8 +563,19 @@ export default function AppIndex() {
   };
 
   return (
-    <Page title="Product Bridge" subtitle="AI-powered product content automation">
-      <BlockStack gap="400">
+    <Page 
+      title="Product Bridge" 
+      subtitle="AI-powered product content automation"
+      primaryAction={
+        <InlineStack gap="200">
+          <Badge tone="info" icon={SparklesIcon}>AI-Powered</Badge>
+        </InlineStack>
+      }
+    >
+      <BlockStack gap="500">
+        {/* Progress Indicator */}
+        <ProgressIndicator current={currentStep} steps={steps} />
+
         {/* Success/Error banners */}
         {extractResult?.success && (
           <Banner
@@ -569,162 +594,181 @@ export default function AppIndex() {
         )}
 
         {/* Step 1: Product Selector */}
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">
-              Step 1: Select Product
-            </Text>
-            <Autocomplete
-              options={productOptions}
-              selected={selectedProduct ? [selectedProduct.id] : []}
-              onSelect={handleProductSelect}
-              textField={
-                <Autocomplete.TextField
-                  onChange={setSearchValue}
-                  label="Search products"
-                  value={searchValue}
-                  prefix={<Icon source={SearchIcon} />}
-                  placeholder="Start typing to search..."
-                  autoComplete="off"
-                />
-              }
-            />
-            {selectedProduct && (
-              <InlineStack gap="400" align="start" blockAlign="center">
-                {selectedProduct.featuredImage?.url && (
-                  <Thumbnail
-                    source={selectedProduct.featuredImage.url}
-                    alt={selectedProduct.title}
-                    size="medium"
-                  />
-                )}
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodyMd" fontWeight="semibold">
-                    {selectedProduct.title}
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    ID: {selectedProduct.id.replace("gid://shopify/Product/", "")}
-                  </Text>
-                </BlockStack>
-                <Badge tone="info">Selected</Badge>
-              </InlineStack>
-            )}
-          </BlockStack>
-        </Card>
+        <StepCard
+          step={1}
+          title="Select Product"
+          description="Choose which product to enhance with AI-extracted content"
+          state={getStepState(1)}
+        >
+          <ProductSelector
+            products={products}
+            selectedProduct={selectedProduct}
+            onSelect={setSelectedProduct}
+          />
+        </StepCard>
 
-        {/* Step 2: Input Source (Tabs: Text / PDF / URL) */}
-        <Card>
+        {/* Step 2: Input Method Selection */}
+        <StepCard
+          step={2}
+          title="Import Product Specs"
+          description="Choose how to provide product information"
+          state={getStepState(2)}
+          disabled={!selectedProduct}
+        >
           <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">
-              Step 2: Import Product Specs
-            </Text>
-            
-            <Tabs tabs={inputTabs} selected={inputTab} onSelect={setInputTab} />
-            
-            {/* Text Input Tab */}
-            {inputTab === 0 && (
-              <BlockStack gap="400">
-                <TextField
-                  label="Raw specs from manufacturer"
-                  multiline={8}
-                  value={specsText}
-                  onChange={setSpecsText}
-                  placeholder="Paste the full specification sheet from the manufacturer website..."
-                  autoComplete="off"
-                />
-                <fetcher.Form method="post">
-                  <input type="hidden" name="intent" value="extract" />
-                  <input type="hidden" name="text" value={specsText} />
-                  <Button variant="primary" submit loading={isExtracting} disabled={!specsText.trim()}>
-                    Extract Content with AI
-                  </Button>
-                </fetcher.Form>
-              </BlockStack>
-            )}
-            
-            {/* PDF Upload Tab */}
-            {inputTab === 1 && (
-              <BlockStack gap="400">
-                <DropZone
-                  onDrop={handleFileDrop}
-                  accept=".pdf,application/pdf"
-                  type="file"
-                  allowMultiple={false}
-                >
-                  {uploadedFile ? (
-                    <BlockStack gap="200" inlineAlign="center">
-                      <Icon source={ImportIcon} tone="success" />
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        {uploadedFile.name}
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </Text>
-                      <Button variant="plain" onClick={() => setUploadedFile(null)}>
-                        Remove
-                      </Button>
-                    </BlockStack>
-                  ) : (
-                    <DropZone.FileUpload actionTitle="Upload PDF" actionHint="or drag and drop" />
-                  )}
-                </DropZone>
-                
-                <InlineStack gap="200">
+            {/* Method Selection */}
+            <InlineStack gap="300">
+              <MethodCard
+                icon={DocumentTextIcon}
+                title="Paste Text"
+                description="Copy specs from manufacturer websites"
+                active={inputMethod === 'text'}
+                onClick={() => setInputMethod('text')}
+              />
+              <MethodCard
+                icon={DocumentIcon}
+                title="Upload PDF"
+                description="Extract from brochures and spec sheets"
+                active={inputMethod === 'pdf'}
+                onClick={() => setInputMethod('pdf')}
+                supportedFormats={['.pdf', 'up to 20MB']}
+              />
+              <MethodCard
+                icon={GlobeIcon}
+                title="Scrape URL"
+                description="Auto-extract from manufacturer pages"
+                active={inputMethod === 'url'}
+                onClick={() => setInputMethod('url')}
+                supportedSites={['Canon', 'Sony', 'Nikon', '+8 more']}
+              />
+            </InlineStack>
+
+            {/* Method-specific inputs */}
+            <Box paddingBlockStart="300">
+              {inputMethod === 'text' && (
+                <BlockStack gap="400">
+                  <TextField
+                    label="Raw specs from manufacturer"
+                    multiline={8}
+                    value={specsText}
+                    onChange={setSpecsText}
+                    placeholder="Paste the full specification sheet from the manufacturer website..."
+                    autoComplete="off"
+                  />
+                  <fetcher.Form method="post">
+                    <input type="hidden" name="intent" value="extract" />
+                    <input type="hidden" name="text" value={specsText} />
+                    <Button 
+                      variant="primary" 
+                      submit 
+                      loading={isExtracting && fetcher.formData?.get("intent") === "extract"} 
+                      disabled={!specsText.trim()}
+                      icon={SparklesIcon}
+                    >
+                      Extract Content with AI
+                    </Button>
+                  </fetcher.Form>
+                </BlockStack>
+              )}
+              
+              {inputMethod === 'pdf' && (
+                <BlockStack gap="400">
+                  <DropZone
+                    onDrop={handleFileDrop}
+                    accept=".pdf,application/pdf"
+                    type="file"
+                    allowMultiple={false}
+                  >
+                    {uploadedFile ? (
+                      <BlockStack gap="200" inlineAlign="center">
+                        <Icon source={ImportIcon} tone="success" />
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                          {uploadedFile.name}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </Text>
+                        <Button variant="plain" onClick={() => setUploadedFile(null)}>
+                          Remove
+                        </Button>
+                      </BlockStack>
+                    ) : (
+                      <DropZone.FileUpload actionTitle="Upload PDF" actionHint="or drag and drop" />
+                    )}
+                  </DropZone>
+                  
                   <Button 
                     variant="primary" 
                     onClick={handlePdfExtract} 
                     loading={isExtracting && fetcher.formData?.get("intent") === "extract-pdf"}
                     disabled={!uploadedFile}
+                    icon={SparklesIcon}
                   >
                     Extract Content from PDF
                   </Button>
-                </InlineStack>
-                
-                <Banner tone="info">
-                  <Text as="p" variant="bodySm">
-                    Upload manufacturer spec sheets or product brochures. Works best with text-based PDFs. 
-                    Image-only PDFs may not extract correctly.
-                  </Text>
-                </Banner>
-              </BlockStack>
+                  
+                  <Banner tone="info">
+                    <Text as="p" variant="bodySm">
+                      Upload manufacturer spec sheets or product brochures. Works best with text-based PDFs.
+                    </Text>
+                  </Banner>
+                </BlockStack>
+              )}
+              
+              {inputMethod === 'url' && (
+                <BlockStack gap="400">
+                  <TextField
+                    label="Manufacturer product page URL"
+                    value={urlValue}
+                    onChange={setUrlValue}
+                    placeholder="https://www.usa.canon.com/shop/p/eos-r5-mark-ii"
+                    autoComplete="off"
+                    prefix={<Icon source={LinkIcon} />}
+                  />
+                  
+                  <Button 
+                    variant="primary" 
+                    onClick={handleUrlExtract}
+                    loading={isExtracting && fetcher.formData?.get("intent") === "extract-url"}
+                    disabled={!urlValue.trim()}
+                    icon={SparklesIcon}
+                  >
+                    Scrape & Extract Content
+                  </Button>
+                  
+                  <Banner tone="info">
+                    <Text as="p" variant="bodySm">
+                      Supported manufacturers: Canon, Sony, Nikon, Fujifilm, Panasonic, Leica, and more.
+                    </Text>
+                  </Banner>
+                </BlockStack>
+              )}
+            </Box>
+
+            {/* AI Extraction Progress */}
+            {isExtracting && (
+              <ExtractionProgress
+                isActive={isExtracting}
+                stages={[
+                  { name: 'Reading content', duration: 2000 },
+                  { name: 'AI analysis', duration: 3000 },
+                  { name: 'Structuring data', duration: 1000 }
+                ]}
+                insights={[
+                  'Analyzing content structure...',
+                  'Identifying key specifications...',
+                  'Organizing product highlights...',
+                  'Extracting included items...'
+                ]}
+              />
             )}
-            
-            {/* URL Scraping Tab */}
-            {inputTab === 2 && (
-              <BlockStack gap="400">
-                <TextField
-                  label="Manufacturer product page URL"
-                  value={urlValue}
-                  onChange={setUrlValue}
-                  placeholder="https://www.usa.canon.com/shop/p/eos-r5-mark-ii"
-                  autoComplete="off"
-                  prefix={<Icon source={LinkIcon} />}
-                />
-                
-                <Button 
-                  variant="primary" 
-                  onClick={handleUrlExtract}
-                  loading={isExtracting && fetcher.formData?.get("intent") === "extract-url"}
-                  disabled={!urlValue.trim()}
-                >
-                  Scrape & Extract Content
-                </Button>
-                
-                <Banner tone="info">
-                  <Text as="p" variant="bodySm">
-                    Supported manufacturers: Canon, Sony, Nikon, Fujifilm, Panasonic, Leica, Sigma, Tamron, 
-                    DJI, GoPro, and more. Works best with product specification pages.
-                  </Text>
-                </Banner>
-              </BlockStack>
-            )}
-            
-            {/* Show source info after extraction */}
+
+            {/* Source info after extraction */}
             {sourceInfo && content && (
               <Banner tone="success">
                 <BlockStack gap="100">
                   <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Content extracted successfully!
+                    ✨ Content extracted successfully!
                   </Text>
                   {sourceInfo.type === "pdf" && (
                     <Text as="p" variant="bodySm">
@@ -741,178 +785,255 @@ export default function AppIndex() {
               </Banner>
             )}
           </BlockStack>
-        </Card>
+        </StepCard>
 
-        {/* Step 3: Edit Content */}
-        {content && (
-          <Card>
+        {/* Step 3: Review & Edit Content */}
+        <StepCard
+          step={3}
+          title="Review & Edit Content"
+          description="Fine-tune the AI-extracted content before saving"
+          state={getStepState(3)}
+          disabled={!content}
+        >
+          {content && (
             <BlockStack gap="500">
               <InlineStack align="space-between">
-                <Text as="h2" variant="headingMd">
-                  Step 3: Review & Edit Content
+                <Text as="h3" variant="headingMd">
+                  Extracted Content
                 </Text>
-                <Button variant="tertiary" onClick={() => setShowPreview(true)}>
-                  Preview JSON
-                </Button>
+                <InlineStack gap="200">
+                  <Button variant="tertiary" onClick={() => setShowPreview(true)}>
+                    Preview JSON
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    loading={isSaving}
+                    disabled={!selectedProduct}
+                    icon={CheckIcon}
+                  >
+                    Save to Product Metafields
+                  </Button>
+                </InlineStack>
               </InlineStack>
 
               {/* Highlights */}
-              <BlockStack gap="300">
-                <InlineStack align="space-between">
-                  <Text as="h3" variant="headingSm">
-                    Highlights ({content.highlights.length})
-                  </Text>
-                  <Button variant="plain" onClick={addHighlight} icon={PlusIcon}>
-                    Add
-                  </Button>
-                </InlineStack>
-                {content.highlights.map((highlight, index) => (
-                  <InlineStack key={index} gap="200" align="start" blockAlign="center">
-                    <div style={{ flex: 1 }}>
-                      <TextField
-                        label=""
-                        labelHidden
-                        value={highlight}
-                        onChange={(v) => updateHighlight(index, v)}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <Button variant="plain" tone="critical" onClick={() => removeHighlight(index)} icon={DeleteIcon} />
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between">
+                    <Text as="h4" variant="headingSm">
+                      Product Highlights ({content.highlights.length})
+                    </Text>
+                    <Button variant="plain" onClick={addHighlight} icon={PlusIcon}>
+                      Add Highlight
+                    </Button>
                   </InlineStack>
-                ))}
-              </BlockStack>
-
-              <Divider />
+                  
+                  {content.highlights.length === 0 ? (
+                    <Box
+                      padding="400"
+                      background="bg-fill-tertiary"
+                      borderRadius="base"
+                    >
+                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                        No highlights extracted. Click "Add Highlight" to create one manually.
+                      </Text>
+                    </Box>
+                  ) : (
+                    content.highlights.map((highlight, index) => (
+                      <InlineStack key={index} gap="200" align="start" blockAlign="center">
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label=""
+                            labelHidden
+                            value={highlight}
+                            onChange={(v) => updateHighlight(index, v)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Button 
+                          variant="plain" 
+                          tone="critical" 
+                          onClick={() => removeHighlight(index)} 
+                          icon={DeleteIcon}
+                          accessibilityLabel="Remove highlight"
+                        />
+                      </InlineStack>
+                    ))
+                  )}
+                </BlockStack>
+              </Card>
 
               {/* Featured Specs */}
-              <BlockStack gap="300">
-                <InlineStack align="space-between">
-                  <Text as="h3" variant="headingSm">
-                    Featured Specs ({content.featured.length})
-                  </Text>
-                  <Button variant="plain" onClick={addFeatured} icon={PlusIcon}>
-                    Add
-                  </Button>
-                </InlineStack>
-                {content.featured.map((spec, index) => (
-                  <InlineStack key={index} gap="200" align="start" blockAlign="end">
-                    <div style={{ flex: 1 }}>
-                      <TextField
-                        label="Title"
-                        value={spec.title}
-                        onChange={(v) => updateFeatured(index, "title", v)}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <TextField
-                        label="Value"
-                        value={spec.value}
-                        onChange={(v) => updateFeatured(index, "value", v)}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <Button variant="plain" tone="critical" onClick={() => removeFeatured(index)} icon={DeleteIcon} />
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between">
+                    <Text as="h4" variant="headingSm">
+                      Featured Specifications ({content.featured.length})
+                    </Text>
+                    <Button variant="plain" onClick={addFeatured} icon={PlusIcon}>
+                      Add Spec
+                    </Button>
                   </InlineStack>
-                ))}
-              </BlockStack>
-
-              <Divider />
+                  
+                  {content.featured.length === 0 ? (
+                    <Box
+                      padding="400"
+                      background="bg-fill-tertiary"
+                      borderRadius="base"
+                    >
+                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                        No featured specs extracted. These are key specs shown prominently.
+                      </Text>
+                    </Box>
+                  ) : (
+                    content.featured.map((spec, index) => (
+                      <InlineStack key={index} gap="200" align="start" blockAlign="end">
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label="Specification"
+                            value={spec.title}
+                            onChange={(v) => updateFeatured(index, "title", v)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label="Value"
+                            value={spec.value}
+                            onChange={(v) => updateFeatured(index, "value", v)}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Button 
+                          variant="plain" 
+                          tone="critical" 
+                          onClick={() => removeFeatured(index)} 
+                          icon={DeleteIcon}
+                          accessibilityLabel="Remove featured spec"
+                        />
+                      </InlineStack>
+                    ))
+                  )}
+                </BlockStack>
+              </Card>
 
               {/* Included Items */}
-              <BlockStack gap="300">
-                <InlineStack align="space-between">
-                  <Text as="h3" variant="headingSm">
-                    What's Included ({content.included.length})
-                  </Text>
-                  <Button variant="plain" onClick={addIncluded} icon={PlusIcon}>
-                    Add
-                  </Button>
-                </InlineStack>
-                {content.included.map((item, index) => (
-                  <InlineStack key={index} gap="200" align="start" blockAlign="end">
-                    <div style={{ flex: 2 }}>
-                      <TextField
-                        label="Item"
-                        value={item.title}
-                        onChange={(v) => updateIncluded(index, "title", v)}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <TextField
-                        label="Link (optional)"
-                        value={item.link}
-                        onChange={(v) => updateIncluded(index, "link", v)}
-                        autoComplete="off"
-                        placeholder="/products/..."
-                      />
-                    </div>
-                    <Button variant="plain" tone="critical" onClick={() => removeIncluded(index)} icon={DeleteIcon} />
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between">
+                    <Text as="h4" variant="headingSm">
+                      What's Included ({content.included.length})
+                    </Text>
+                    <Button variant="plain" onClick={addIncluded} icon={PlusIcon}>
+                      Add Item
+                    </Button>
                   </InlineStack>
-                ))}
-              </BlockStack>
-
-              <Divider />
-
-              {/* Specs (collapsible by group) */}
-              <BlockStack gap="400">
-                <Text as="h3" variant="headingSm">
-                  Specifications ({content.specs.length} groups)
-                </Text>
-                {content.specs.map((group, groupIndex) => (
-                  <Card key={groupIndex}>
-                    <BlockStack gap="300">
-                      <Text as="h4" variant="headingSm">
-                        {group.heading}
+                  
+                  {content.included.length === 0 ? (
+                    <Box
+                      padding="400"
+                      background="bg-fill-tertiary"
+                      borderRadius="base"
+                    >
+                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                        No included items found. List accessories and components included with the product.
                       </Text>
-                      {group.lines.map((line, lineIndex) => (
-                        <InlineStack key={lineIndex} gap="200" align="start" blockAlign="end">
-                          <div style={{ flex: 1 }}>
-                            <TextField
-                              label="Spec"
-                              value={line.title}
-                              onChange={(v) => updateSpecLine(groupIndex, lineIndex, "title", v)}
-                              autoComplete="off"
-                              size="slim"
-                            />
-                          </div>
-                          <div style={{ flex: 2 }}>
-                            <TextField
-                              label="Value"
-                              value={line.text}
-                              onChange={(v) => updateSpecLine(groupIndex, lineIndex, "text", v)}
-                              autoComplete="off"
-                              size="slim"
-                            />
-                          </div>
-                          <Button
-                            variant="plain"
-                            tone="critical"
-                            onClick={() => removeSpecLine(groupIndex, lineIndex)}
-                            icon={DeleteIcon}
+                    </Box>
+                  ) : (
+                    content.included.map((item, index) => (
+                      <InlineStack key={index} gap="200" align="start" blockAlign="end">
+                        <div style={{ flex: 2 }}>
+                          <TextField
+                            label="Item"
+                            value={item.title}
+                            onChange={(v) => updateIncluded(index, "title", v)}
+                            autoComplete="off"
                           />
-                        </InlineStack>
-                      ))}
-                    </BlockStack>
-                  </Card>
-                ))}
-              </BlockStack>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label="Link (optional)"
+                            value={item.link}
+                            onChange={(v) => updateIncluded(index, "link", v)}
+                            autoComplete="off"
+                            placeholder="/products/..."
+                          />
+                        </div>
+                        <Button 
+                          variant="plain" 
+                          tone="critical" 
+                          onClick={() => removeIncluded(index)} 
+                          icon={DeleteIcon}
+                          accessibilityLabel="Remove included item"
+                        />
+                      </InlineStack>
+                    ))
+                  )}
+                </BlockStack>
+              </Card>
 
-              <Divider />
-
-              {/* Save Button */}
-              <InlineStack align="end">
-                <Button
-                  variant="primary"
-                  onClick={handleSave}
-                  loading={isSaving}
-                  disabled={!selectedProduct}
-                  icon={CheckIcon}
-                >
-                  Save to Product Metafields
-                </Button>
-              </InlineStack>
+              {/* Specifications */}
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h4" variant="headingSm">
+                    Detailed Specifications ({content.specs.length} groups)
+                  </Text>
+                  
+                  {content.specs.length === 0 ? (
+                    <Box
+                      padding="400"
+                      background="bg-fill-tertiary"
+                      borderRadius="base"
+                    >
+                      <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                        No specifications extracted. The detailed tech specs will appear here.
+                      </Text>
+                    </Box>
+                  ) : (
+                    content.specs.map((group, groupIndex) => (
+                      <Card key={groupIndex} background="bg-surface-secondary">
+                        <BlockStack gap="300">
+                          <Text as="h5" variant="bodyMd" fontWeight="semibold">
+                            {group.heading}
+                          </Text>
+                          {group.lines.map((line, lineIndex) => (
+                            <InlineStack key={lineIndex} gap="200" align="start" blockAlign="end">
+                              <div style={{ flex: 1 }}>
+                                <TextField
+                                  label="Specification"
+                                  labelHidden
+                                  value={line.title}
+                                  onChange={(v) => updateSpecLine(groupIndex, lineIndex, "title", v)}
+                                  autoComplete="off"
+                                  size="slim"
+                                />
+                              </div>
+                              <div style={{ flex: 2 }}>
+                                <TextField
+                                  label="Value"
+                                  labelHidden
+                                  value={line.text}
+                                  onChange={(v) => updateSpecLine(groupIndex, lineIndex, "text", v)}
+                                  autoComplete="off"
+                                  size="slim"
+                                />
+                              </div>
+                              <Button
+                                variant="plain"
+                                tone="critical"
+                                onClick={() => removeSpecLine(groupIndex, lineIndex)}
+                                icon={DeleteIcon}
+                                accessibilityLabel="Remove specification"
+                              />
+                            </InlineStack>
+                          ))}
+                        </BlockStack>
+                      </Card>
+                    ))
+                  )}
+                </BlockStack>
+              </Card>
 
               {!selectedProduct && (
                 <Banner tone="warning">
@@ -920,8 +1041,8 @@ export default function AppIndex() {
                 </Banner>
               )}
             </BlockStack>
-          </Card>
-        )}
+          )}
+        </StepCard>
 
         {/* JSON Preview Modal */}
         <Modal
@@ -930,7 +1051,15 @@ export default function AppIndex() {
           title="JSON Preview"
         >
           <Modal.Section>
-            <pre style={{ fontSize: "12px", overflow: "auto", maxHeight: "500px", background: "#f6f6f7", padding: "16px", borderRadius: "8px" }}>
+            <pre style={{ 
+              fontSize: "12px", 
+              overflow: "auto", 
+              maxHeight: "500px", 
+              background: "#f6f6f7", 
+              padding: "16px", 
+              borderRadius: "8px",
+              border: "1px solid #e1e3e5"
+            }}>
               {JSON.stringify(content, null, 2)}
             </pre>
           </Modal.Section>

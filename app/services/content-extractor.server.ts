@@ -111,7 +111,7 @@ export async function extractProductContent(rawText: string): Promise<ProductCon
     }
     
     // Normalize and validate the response
-    const result = {
+    const extractedContent = {
       specs: Array.isArray(parsed.specs) ? parsed.specs.filter((s: any) => s.heading && Array.isArray(s.lines)) : [],
       highlights: Array.isArray(parsed.highlights) ? parsed.highlights.filter((h: any) => typeof h === 'string' && h.trim()) : [],
       included: Array.isArray(parsed.included) ? parsed.included.filter((i: any) => i.title && typeof i.title === 'string') : [],
@@ -119,8 +119,8 @@ export async function extractProductContent(rawText: string): Promise<ProductCon
     };
 
     // Check if we got any meaningful content
-    const hasContent = result.specs.length > 0 || result.highlights.length > 0 || 
-                      result.included.length > 0 || result.featured.length > 0;
+    const hasContent = extractedContent.specs.length > 0 || extractedContent.highlights.length > 0 || 
+                      extractedContent.included.length > 0 || extractedContent.featured.length > 0;
     
     if (!hasContent) {
       const error: UserError = {
@@ -131,7 +131,7 @@ export async function extractProductContent(rawText: string): Promise<ProductCon
       throw error;
     }
 
-    return result;
+    return extractedContent;
   } catch (error) {
     // If it's already a UserError, re-throw it
     if (error && typeof error === "object" && "code" in error) {
