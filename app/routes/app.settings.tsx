@@ -60,7 +60,6 @@ export default function SettingsPage() {
       title="Settings"
       subtitle="Manage connections and store context"
       primaryAction={{ content: "Save", disabled: true }}
-      breadcrumbs={[{ content: "Home", url: "/app" }]}
     >
       <Layout>
         <Layout.Section>

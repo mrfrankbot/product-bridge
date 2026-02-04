@@ -110,7 +110,6 @@ export default function ProductsPage() {
       title="Products"
       subtitle="Products enhanced with Product Bridge metafields"
       primaryAction={{ content: "Import Specs", url: "/app/import", icon: ImportIcon }}
-      breadcrumbs={[{ content: "Home", url: "/app" }]}
     >
       <Layout>
         <Layout.Section>
@@ -164,13 +163,13 @@ export default function ProductsPage() {
                         </BlockStack>
                         <InlineStack gap="200">
                           <Badge
-                            tone={contentStatus.hasSpecs ? "success" : "subdued"}
+                            tone={contentStatus.hasSpecs ? "success" : "attention"}
                             icon={contentStatus.hasSpecs ? CheckIcon : undefined}
                           >
                             Specs
                           </Badge>
                           <Badge
-                            tone={contentStatus.hasHighlights ? "success" : "subdued"}
+                            tone={contentStatus.hasHighlights ? "success" : "attention"}
                             icon={contentStatus.hasHighlights ? CheckIcon : undefined}
                           >
                             Highlights

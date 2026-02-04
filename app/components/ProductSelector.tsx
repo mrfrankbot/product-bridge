@@ -10,7 +10,8 @@ import {
   Box,
   Card,
   Button,
-  Banner
+  Banner,
+  EmptyState,
 } from "@shopify/polaris";
 import { SearchIcon, CheckIcon } from "@shopify/polaris-icons";
 
@@ -24,7 +25,7 @@ interface Product {
 interface ProductSelectorProps {
   products: Product[];
   selectedProduct: Product | null;
-  onSelect: (product: Product) => void;
+  onSelect: (product: Product | null) => void;
   placeholder?: string;
   loading?: boolean;
 }
@@ -65,39 +66,13 @@ export function ProductSelector({
     setSearchValue(value);
   }, []);
 
-  const EmptyState = () => (
-    <Box padding="400">
-      <BlockStack gap="300" inlineAlign="center">
-        <Icon source={SearchIcon} tone="subdued" />
-        <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
-          No products found
-        </Text>
-        <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-          Try adjusting your search or import products first
-        </Text>
-        <Button variant="plain" size="micro">
-          Import Products
-        </Button>
-      </BlockStack>
-    </Box>
-  );
-
-  const LoadingState = () => (
-    <Box padding="400">
-      <InlineStack gap="300" align="center">
-        <div style={{ 
-          width: '24px', 
-          height: '24px', 
-          border: '2px solid var(--p-color-border-secondary)',
-          borderTop: '2px solid var(--p-color-border-emphasis)',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
-        <Text as="p" variant="bodySm" tone="subdued">
-          Searching products...
-        </Text>
-      </InlineStack>
-    </Box>
+  const EmptyStateMarkup = () => (
+    <EmptyState
+      heading="No products found"
+      image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+    >
+      <p>Try adjusting your search or add products in Shopify Admin.</p>
+    </EmptyState>
   );
 
   return (
@@ -107,7 +82,7 @@ export function ProductSelector({
         selected={selectedProduct ? [selectedProduct.id] : []}
         onSelect={handleProductSelect}
         loading={loading}
-        emptyState={<EmptyState />}
+        emptyState={<EmptyStateMarkup />}
         listTitle="Products"
         textField={
           <Autocomplete.TextField
@@ -155,7 +130,7 @@ export function ProductSelector({
                 variant="plain" 
                 size="micro"
                 onClick={() => {
-                  onSelect(null as any);
+                  onSelect(null);
                   setSearchValue("");
                 }}
               >
