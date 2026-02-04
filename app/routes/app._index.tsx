@@ -32,10 +32,10 @@ import {
   CheckIcon, 
   ImportIcon, 
   LinkIcon,
-  DocumentTextIcon,
-  DocumentIcon,
+  NoteIcon,
+  FileIcon,
   GlobeIcon,
-  SparklesIcon
+  MagicIcon
 } from "@shopify/polaris-icons";
 
 // Import our enhanced components
@@ -568,7 +568,7 @@ export default function AppIndex() {
       subtitle="AI-powered product content automation"
       primaryAction={
         <InlineStack gap="200">
-          <Badge tone="info" icon={SparklesIcon}>AI-Powered</Badge>
+          <Badge tone="info" icon={MagicIcon}>AI-Powered</Badge>
         </InlineStack>
       }
     >
@@ -619,14 +619,14 @@ export default function AppIndex() {
             {/* Method Selection */}
             <InlineStack gap="300">
               <MethodCard
-                icon={DocumentTextIcon}
+                icon={NoteIcon}
                 title="Paste Text"
                 description="Copy specs from manufacturer websites"
                 active={inputMethod === 'text'}
                 onClick={() => setInputMethod('text')}
               />
               <MethodCard
-                icon={DocumentIcon}
+                icon={FileIcon}
                 title="Upload PDF"
                 description="Extract from brochures and spec sheets"
                 active={inputMethod === 'pdf'}
@@ -663,7 +663,7 @@ export default function AppIndex() {
                       submit 
                       loading={isExtracting && fetcher.formData?.get("intent") === "extract"} 
                       disabled={!specsText.trim()}
-                      icon={SparklesIcon}
+                      icon={MagicIcon}
                     >
                       Extract Content with AI
                     </Button>
@@ -702,7 +702,7 @@ export default function AppIndex() {
                     onClick={handlePdfExtract} 
                     loading={isExtracting && fetcher.formData?.get("intent") === "extract-pdf"}
                     disabled={!uploadedFile}
-                    icon={SparklesIcon}
+                    icon={MagicIcon}
                   >
                     Extract Content from PDF
                   </Button>
@@ -731,7 +731,7 @@ export default function AppIndex() {
                     onClick={handleUrlExtract}
                     loading={isExtracting && fetcher.formData?.get("intent") === "extract-url"}
                     disabled={!urlValue.trim()}
-                    icon={SparklesIcon}
+                    icon={MagicIcon}
                   >
                     Scrape & Extract Content
                   </Button>

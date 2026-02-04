@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { BlockStack, InlineStack, Text, ProgressBar, Box, Icon, Spinner } from "@shopify/polaris";
-import { SparklesIcon, DocumentTextIcon, AiIcon } from "@shopify/polaris-icons";
+import { MagicIcon, NoteIcon } from "@shopify/polaris-icons";
 
 interface ExtractionStage {
   name: string;
@@ -85,7 +85,7 @@ export function ExtractionProgress({ isActive, stages, insights = [] }: Extracti
               alignItems: 'center',
               justifyContent: 'center'
             }}>
-              <Icon source={SparklesIcon} />
+              <Icon source={MagicIcon} />
             </div>
           </Box>
           
@@ -123,7 +123,7 @@ export function ExtractionProgress({ isActive, stages, insights = [] }: Extracti
             borderColor="border-info"
           >
             <InlineStack gap="200" align="start" blockAlign="center">
-              <Icon source={DocumentTextIcon} tone="info" />
+              <Icon source={NoteIcon} tone="info" />
               <Text as="p" variant="bodySm" tone="info">
                 {currentInsightText}
               </Text>

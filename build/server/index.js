@@ -1,16 +1,17 @@
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { PassThrough } from 'node:stream';
-import { createReadableStreamFromReadable, json, unstable_createMemoryUploadHandler, unstable_parseMultipartFormData, redirect } from '@remix-run/node';
+import { createReadableStreamFromReadable, unstable_createMemoryUploadHandler, unstable_parseMultipartFormData, json, redirect } from '@remix-run/node';
 import { RemixServer, Meta, Links, Outlet, ScrollRestoration, Scripts, useLoaderData, useFetcher, useRouteError, useActionData, Form, Link } from '@remix-run/react';
 import * as isbotModule from 'isbot';
 import { renderToPipeableStream } from 'react-dom/server';
-import OpenAI from 'openai';
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Thumbnail, Page, BlockStack, Banner, Card, Text, Autocomplete, Icon, InlineStack, Badge, Tabs, TextField, Button, DropZone, Divider, Modal, AppProvider, FormLayout } from '@shopify/polaris';
-import { SearchIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon, CheckIcon } from '@shopify/polaris-icons';
+import { Thumbnail, Page, BlockStack, Banner, Card, Text, Autocomplete, Icon, InlineStack, Badge, Tabs, TextField, Button, DropZone, Divider, Modal, Box, ProgressBar, Spinner, AppProvider, FormLayout } from '@shopify/polaris';
+import { SearchIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, MagicIcon, NoteIcon, FileIcon, GlobeIcon } from '@shopify/polaris-icons';
 import '@shopify/shopify-app-remix/adapters/node';
 import { shopifyApp, AppDistribution, LATEST_API_VERSION, boundary } from '@shopify/shopify-app-remix/server';
 import { MemorySessionStorage } from '@shopify/shopify-app-session-storage-memory';
+import { kv } from '@vercel/kv';
+import OpenAI from 'openai';
 import pdf from 'pdf-parse';
 import * as cheerio from 'cheerio';
 import { AppProvider as AppProvider$1 } from '@shopify/shopify-app-remix/react';
@@ -157,6 +158,82 @@ const route0 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: App$1
 }, Symbol.toStringTag, { value: 'Module' }));
+
+class KVSessionStorage {
+  prefix = "shopify_session:";
+  async storeSession(session) {
+    try {
+      const key = this.prefix + session.id;
+      await kv.set(key, JSON.stringify(session), { ex: 86400 });
+      return true;
+    } catch (error) {
+      console.error("Failed to store session:", error);
+      return false;
+    }
+  }
+  async loadSession(id) {
+    try {
+      const key = this.prefix + id;
+      const data = await kv.get(key);
+      if (!data) return void 0;
+      const sessionData = typeof data === "string" ? JSON.parse(data) : data;
+      return sessionData;
+    } catch (error) {
+      console.error("Failed to load session:", error);
+      return void 0;
+    }
+  }
+  async deleteSession(id) {
+    try {
+      const key = this.prefix + id;
+      await kv.del(key);
+      return true;
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+      return false;
+    }
+  }
+  async deleteSessions(ids) {
+    try {
+      const keys = ids.map((id) => this.prefix + id);
+      if (keys.length > 0) {
+        await kv.del(...keys);
+      }
+      return true;
+    } catch (error) {
+      console.error("Failed to delete sessions:", error);
+      return false;
+    }
+  }
+  async findSessionsByShop(shop) {
+    console.warn("findSessionsByShop not fully implemented for KV storage");
+    return [];
+  }
+}
+
+const isProduction = process.env.NODE_ENV === "production" || process.env.KV_REST_API_URL;
+const sessionStorage = isProduction ? new KVSessionStorage() : new MemorySessionStorage();
+console.log(`Using ${isProduction ? "Vercel KV" : "Memory"} session storage`);
+const shopify = shopifyApp({
+  apiKey: process.env.SHOPIFY_API_KEY,
+  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
+  apiVersion: LATEST_API_VERSION,
+  scopes: process.env.SCOPES?.split(",") || ["read_products", "write_products", "read_metafields", "write_metafields"],
+  appUrl: process.env.SHOPIFY_APP_URL || "",
+  authPathPrefix: "/auth",
+  sessionStorage,
+  distribution: AppDistribution.AppStore,
+  isEmbeddedApp: true,
+  future: {
+    unstable_newEmbeddedAuthStrategy: true
+  },
+  ...process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}
+});
+shopify.addDocumentResponseHeaders;
+const authenticate = shopify.authenticate;
+shopify.unauthenticated;
+const login = shopify.login;
+shopify.registerWebhooks;
 
 const DEFAULT_OPTIONS = {
   maxAttempts: 3,
@@ -423,51 +500,6 @@ ${rawText}`
     throw userError;
   }
 }
-
-async function action$3({ request }) {
-  if (request.method !== "POST") {
-    return json({ error: "Method not allowed" }, { status: 405 });
-  }
-  try {
-    const body = await request.json();
-    const { text } = body;
-    if (!text || typeof text !== "string") {
-      return json({ error: "Missing or invalid 'text' field" }, { status: 400 });
-    }
-    const result = await extractProductContent(text);
-    return json(result);
-  } catch (error) {
-    console.error("API extraction error:", error);
-    return json({ error: "Extraction failed" }, { status: 500 });
-  }
-}
-
-const route1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
-  __proto__: null,
-  action: action$3
-}, Symbol.toStringTag, { value: 'Module' }));
-
-const shopify = shopifyApp({
-  apiKey: process.env.SHOPIFY_API_KEY,
-  apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: LATEST_API_VERSION,
-  scopes: process.env.SCOPES?.split(",") || ["read_products", "write_products", "read_metafields", "write_metafields"],
-  appUrl: process.env.SHOPIFY_APP_URL || "",
-  authPathPrefix: "/auth",
-  sessionStorage: new MemorySessionStorage(),
-  distribution: AppDistribution.AppStore,
-  isEmbeddedApp: true,
-  future: {
-    unstable_newEmbeddedAuthStrategy: true
-  },
-  ...process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}
-});
-shopify.addDocumentResponseHeaders;
-const authenticate = shopify.authenticate;
-shopify.unauthenticated;
-const login = shopify.login;
-shopify.registerWebhooks;
-shopify.sessionStorage;
 
 async function parsePdf(buffer) {
   try {
@@ -842,7 +874,7 @@ function asUserError(err, fallback) {
   return fallback;
 }
 
-const PRODUCTS_QUERY = `#graphql
+const PRODUCTS_QUERY$1 = `#graphql
   query ProductsQuery($query: String, $first: Int!) {
     products(first: $first, query: $query) {
       edges {
@@ -859,7 +891,7 @@ const PRODUCTS_QUERY = `#graphql
     }
   }
 `;
-const METAFIELDS_SET_MUTATION = `#graphql
+const METAFIELDS_SET_MUTATION$1 = `#graphql
   mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
     metafieldsSet(metafields: $metafields) {
       metafields {
@@ -875,11 +907,11 @@ const METAFIELDS_SET_MUTATION = `#graphql
     }
   }
 `;
-const loader$4 = async ({ request }) => {
+const loader$5 = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const url = new URL(request.url);
   const searchQuery = url.searchParams.get("search") || "";
-  const response = await admin.graphql(PRODUCTS_QUERY, {
+  const response = await admin.graphql(PRODUCTS_QUERY$1, {
     variables: {
       query: searchQuery ? `title:*${searchQuery}*` : "",
       first: 25
@@ -889,7 +921,7 @@ const loader$4 = async ({ request }) => {
   const products = data.data?.products?.edges?.map((edge) => edge.node) || [];
   return json({ products });
 };
-const action$2 = async ({ request }) => {
+const action$4 = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const contentType = request.headers.get("content-type") || "";
   let formData;
@@ -1049,7 +1081,7 @@ const action$2 = async ({ request }) => {
         }
       ];
       const shopifyResult = await retryShopify(
-        () => admin.graphql(METAFIELDS_SET_MUTATION, {
+        () => admin.graphql(METAFIELDS_SET_MUTATION$1, {
           variables: { metafields }
         })
       );
@@ -1087,7 +1119,7 @@ const action$2 = async ({ request }) => {
   }
   return json({ error: "Invalid intent" }, { status: 400 });
 };
-function AppIndex() {
+function AppIndex$1() {
   const { products } = useLoaderData();
   const fetcher = useFetcher();
   useRef(null);
@@ -1533,6 +1565,1343 @@ function AppIndex() {
     )
   ] }) });
 }
+function ErrorBoundary$2() {
+  const error = useRouteError();
+  const getErrorInfo = () => {
+    if (error && typeof error === "object" && "message" in error && "suggestion" in error) {
+      return error;
+    }
+    return {
+      message: "Something went wrong.",
+      suggestion: "Try refreshing the page or re-opening the app."
+    };
+  };
+  const { message, suggestion } = getErrorInfo();
+  return /* @__PURE__ */ jsx(Page, { title: "Product Bridge", children: /* @__PURE__ */ jsx(Banner, { tone: "critical", title: message, children: suggestion }) });
+}
+
+const route1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  ErrorBoundary: ErrorBoundary$2,
+  action: action$4,
+  default: AppIndex$1,
+  loader: loader$5
+}, Symbol.toStringTag, { value: 'Module' }));
+
+async function action$3({ request }) {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, { status: 405 });
+  }
+  try {
+    const body = await request.json();
+    const { text } = body;
+    if (!text || typeof text !== "string") {
+      return json({ error: "Missing or invalid 'text' field" }, { status: 400 });
+    }
+    const result = await extractProductContent(text);
+    return json(result);
+  } catch (error) {
+    console.error("API extraction error:", error);
+    return json({ error: "Extraction failed" }, { status: 500 });
+  }
+}
+
+const route2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  action: action$3
+}, Symbol.toStringTag, { value: 'Module' }));
+
+function ProgressIndicator({ current, steps }) {
+  return /* @__PURE__ */ jsx(Box, { paddingBlock: "400", children: /* @__PURE__ */ jsx(InlineStack, { gap: "300", align: "center", children: steps.map((step, index) => {
+    const stepNumber = index + 1;
+    const isActive = current === stepNumber;
+    const isComplete = current > stepNumber;
+    const isUpcoming = current < stepNumber;
+    return /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "center", blockAlign: "center", children: [
+      /* @__PURE__ */ jsx(
+        Box,
+        {
+          background: isActive ? "bg-fill-emphasis" : isComplete ? "bg-fill-success" : "bg-fill-tertiary",
+          padding: "100",
+          borderRadius: "full",
+          width: "32px",
+          height: "32px",
+          minHeight: "32px",
+          minWidth: "32px",
+          position: "relative",
+          children: /* @__PURE__ */ jsx("div", { style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            color: isActive || isComplete ? "#fff" : "#6b7280",
+            fontSize: "14px",
+            fontWeight: "600"
+          }, children: isComplete ? /* @__PURE__ */ jsx(CheckIcon, {}) : stepNumber })
+        }
+      ),
+      /* @__PURE__ */ jsxs(Box, { children: [
+        /* @__PURE__ */ jsx(
+          Text,
+          {
+            as: "span",
+            variant: isActive ? "bodyMd" : "bodySm",
+            fontWeight: isActive ? "semibold" : "regular",
+            tone: isUpcoming ? "subdued" : void 0,
+            children: step.title
+          }
+        ),
+        step.description && isActive && /* @__PURE__ */ jsx(Box, { paddingBlockStart: "100", children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", children: step.description }) })
+      ] }),
+      index < steps.length - 1 && /* @__PURE__ */ jsx(
+        Box,
+        {
+          background: current > stepNumber ? "bg-fill-success" : "bg-fill-tertiary",
+          width: "24px",
+          height: "2px",
+          borderRadius: "base"
+        }
+      )
+    ] }, index);
+  }) }) });
+}
+
+function StepCard({
+  step,
+  title,
+  description,
+  state,
+  children,
+  onActivate,
+  disabled = false
+}) {
+  const [isExpanded, setIsExpanded] = useState(state === "active");
+  useEffect(() => {
+    setIsExpanded(state === "active");
+  }, [state]);
+  const getCardBackground = () => {
+    switch (state) {
+      case "active":
+        return "bg-fill-emphasis-hover";
+      case "complete":
+        return "bg-fill-success-secondary";
+      default:
+        return void 0;
+    }
+  };
+  const canToggle = state !== "inactive" && !disabled;
+  const handleToggle = () => {
+    if (!canToggle) return;
+    if (state === "complete" || state === "active") {
+      setIsExpanded(!isExpanded);
+    }
+    if (state === "inactive" && onActivate) {
+      onActivate();
+    }
+  };
+  return /* @__PURE__ */ jsx(
+    Card,
+    {
+      background: getCardBackground(),
+      padding: isExpanded ? "500" : "400",
+      children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: handleToggle,
+            disabled: !canToggle,
+            style: {
+              border: "none",
+              background: "none",
+              padding: 0,
+              cursor: canToggle ? "pointer" : "default",
+              textAlign: "left",
+              width: "100%"
+            },
+            children: /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", blockAlign: "center", children: [
+              /* @__PURE__ */ jsxs(InlineStack, { gap: "300", align: "start", blockAlign: "center", children: [
+                /* @__PURE__ */ jsx(
+                  Box,
+                  {
+                    background: state === "active" ? "bg-fill-emphasis" : state === "complete" ? "bg-fill-success" : "bg-fill-tertiary",
+                    padding: "200",
+                    borderRadius: "full",
+                    minWidth: "32px",
+                    minHeight: "32px",
+                    children: /* @__PURE__ */ jsx("div", { style: {
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: state === "inactive" ? "#6b7280" : "#fff",
+                      fontSize: "14px",
+                      fontWeight: "600"
+                    }, children: state === "complete" ? /* @__PURE__ */ jsx(Icon, { source: CheckIcon }) : step })
+                  }
+                ),
+                /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
+                  /* @__PURE__ */ jsx(
+                    Text,
+                    {
+                      as: "h3",
+                      variant: state === "active" ? "headingSm" : "bodyMd",
+                      fontWeight: state === "active" ? "semibold" : "medium",
+                      tone: state === "inactive" ? "subdued" : void 0,
+                      children: title
+                    }
+                  ),
+                  description && /* @__PURE__ */ jsx(
+                    Text,
+                    {
+                      as: "p",
+                      variant: "bodySm",
+                      tone: state === "inactive" ? "subdued" : "subdued",
+                      children: description
+                    }
+                  )
+                ] })
+              ] }),
+              canToggle && /* @__PURE__ */ jsx(
+                Icon,
+                {
+                  source: isExpanded ? ChevronDownIcon : ChevronRightIcon,
+                  tone: state === "inactive" ? "subdued" : void 0
+                }
+              )
+            ] })
+          }
+        ),
+        isExpanded && /* @__PURE__ */ jsx(
+          Box,
+          {
+            paddingBlockStart: "300",
+            style: {
+              borderTop: `1px solid var(--p-color-border-secondary)`
+            },
+            children
+          }
+        )
+      ] })
+    }
+  );
+}
+
+function MethodCard({
+  icon,
+  title,
+  description,
+  active,
+  onClick,
+  supportedFormats,
+  supportedSites,
+  gradient
+}) {
+  return /* @__PURE__ */ jsx(
+    "button",
+    {
+      onClick,
+      style: {
+        border: "none",
+        background: "none",
+        padding: 0,
+        cursor: "pointer",
+        width: "100%"
+      },
+      children: /* @__PURE__ */ jsx(
+        Card,
+        {
+          background: active ? "bg-fill-emphasis-hover" : void 0,
+          padding: "400",
+          children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+            /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
+              /* @__PURE__ */ jsx(
+                Box,
+                {
+                  background: active ? "bg-fill-emphasis" : "bg-fill-tertiary",
+                  padding: "200",
+                  borderRadius: "base",
+                  children: /* @__PURE__ */ jsx("div", { style: {
+                    color: active ? "#fff" : "#6b7280",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                  }, children: /* @__PURE__ */ jsx(Icon, { source: icon }) })
+                }
+              ),
+              /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
+                /* @__PURE__ */ jsx(
+                  Text,
+                  {
+                    as: "h4",
+                    variant: "bodyMd",
+                    fontWeight: "semibold",
+                    alignment: "start",
+                    children: title
+                  }
+                ),
+                active && /* @__PURE__ */ jsx(Badge, { tone: "info", size: "small", children: "Active" })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", alignment: "start", children: description }),
+            (supportedFormats || supportedSites) && /* @__PURE__ */ jsx(Box, { paddingBlockStart: "200", children: /* @__PURE__ */ jsxs(Text, { as: "p", variant: "captionMd", tone: "subdued", alignment: "start", children: [
+              supportedFormats && `Supports: ${supportedFormats.join(", ")}`,
+              supportedSites && `Works with: ${supportedSites.join(", ")}`
+            ] }) })
+          ] })
+        }
+      )
+    }
+  );
+}
+
+function ExtractionProgress({ isActive, stages, insights = [] }) {
+  const [currentStage, setCurrentStage] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [currentInsight, setCurrentInsight] = useState(0);
+  useEffect(() => {
+    if (isActive) {
+      setCurrentStage(0);
+      setProgress(0);
+      setCurrentInsight(0);
+    }
+  }, [isActive]);
+  useEffect(() => {
+    if (!isActive) return;
+    const totalDuration = stages.reduce((sum, stage) => sum + stage.duration, 0);
+    let elapsed = 0;
+    const interval = setInterval(() => {
+      elapsed += 100;
+      const newProgress = Math.min(elapsed / totalDuration * 100, 100);
+      setProgress(newProgress);
+      let stageElapsed = 0;
+      for (let i = 0; i < stages.length; i++) {
+        stageElapsed += stages[i].duration;
+        if (elapsed <= stageElapsed) {
+          setCurrentStage(i);
+          break;
+        }
+      }
+      if (insights.length > 0) {
+        const insightInterval = 2e3;
+        setCurrentInsight(Math.floor(elapsed / insightInterval) % insights.length);
+      }
+      if (elapsed >= totalDuration) {
+        clearInterval(interval);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isActive, stages, insights]);
+  if (!isActive) return null;
+  const currentStageData = stages[currentStage];
+  const currentInsightText = insights[currentInsight];
+  return /* @__PURE__ */ jsx(Box, { padding: "400", background: "bg-fill-tertiary", borderRadius: "base", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+    /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
+      /* @__PURE__ */ jsx(
+        Box,
+        {
+          background: "bg-fill-emphasis",
+          padding: "200",
+          borderRadius: "full",
+          children: /* @__PURE__ */ jsx("div", { style: {
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }, children: /* @__PURE__ */ jsx(Icon, { source: MagicIcon }) })
+        }
+      ),
+      /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
+        /* @__PURE__ */ jsx(Text, { as: "h4", variant: "bodyMd", fontWeight: "semibold", children: "AI is extracting your content..." }),
+        /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", children: "This usually takes 10-15 seconds" })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx(
+      ProgressBar,
+      {
+        progress,
+        size: "small"
+      }
+    ),
+    /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
+      /* @__PURE__ */ jsx(Spinner, { size: "small" }),
+      /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", children: currentStageData?.name || "Processing..." })
+    ] }),
+    currentInsightText && /* @__PURE__ */ jsx(
+      Box,
+      {
+        padding: "300",
+        background: "bg-fill-info-secondary",
+        borderRadius: "base",
+        borderWidth: "025",
+        borderColor: "border-info",
+        children: /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
+          /* @__PURE__ */ jsx(Icon, { source: NoteIcon, tone: "info" }),
+          /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "info", children: currentInsightText })
+        ] })
+      }
+    ),
+    /* @__PURE__ */ jsx(BlockStack, { gap: "200", children: stages.map((stage, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
+      /* @__PURE__ */ jsx("div", { style: {
+        width: "6px",
+        height: "6px",
+        borderRadius: "50%",
+        backgroundColor: index <= currentStage ? "var(--p-color-bg-fill-success)" : "var(--p-color-bg-fill-tertiary)"
+      } }),
+      /* @__PURE__ */ jsx(
+        Text,
+        {
+          as: "p",
+          variant: "captionMd",
+          tone: index <= currentStage ? void 0 : "subdued",
+          children: stage.name
+        }
+      )
+    ] }, index)) })
+  ] }) });
+}
+
+function ProductSelector({
+  products,
+  selectedProduct,
+  onSelect,
+  placeholder = "Search by product name, SKU, or handle...",
+  loading = false
+}) {
+  const [searchValue, setSearchValue] = useState(selectedProduct?.title || "");
+  const productOptions = products.map((product) => ({
+    value: product.id,
+    label: product.title,
+    media: product.featuredImage?.url ? /* @__PURE__ */ jsx(
+      Thumbnail,
+      {
+        source: product.featuredImage.url,
+        alt: product.featuredImage.altText || product.title,
+        size: "small"
+      }
+    ) : void 0
+  }));
+  const handleProductSelect = useCallback(
+    (selected) => {
+      const product = products.find((p) => p.id === selected[0]);
+      if (product) {
+        onSelect(product);
+        setSearchValue(product.title);
+      }
+    },
+    [products, onSelect]
+  );
+  const handleInputChange = useCallback((value) => {
+    setSearchValue(value);
+  }, []);
+  const EmptyState = () => /* @__PURE__ */ jsx(Box, { padding: "400", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", inlineAlign: "center", children: [
+    /* @__PURE__ */ jsx(Icon, { source: SearchIcon, tone: "subdued" }),
+    /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodyMd", tone: "subdued", alignment: "center", children: "No products found" }),
+    /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", alignment: "center", children: "Try adjusting your search or import products first" }),
+    /* @__PURE__ */ jsx(Button, { variant: "plain", size: "micro", children: "Import Products" })
+  ] }) });
+  return /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+    /* @__PURE__ */ jsx(
+      Autocomplete,
+      {
+        options: productOptions,
+        selected: selectedProduct ? [selectedProduct.id] : [],
+        onSelect: handleProductSelect,
+        loading,
+        emptyState: /* @__PURE__ */ jsx(EmptyState, {}),
+        listTitle: "Products",
+        textField: /* @__PURE__ */ jsx(
+          Autocomplete.TextField,
+          {
+            onChange: handleInputChange,
+            label: "Select a product",
+            value: searchValue,
+            prefix: /* @__PURE__ */ jsx(Icon, { source: SearchIcon }),
+            placeholder,
+            autoComplete: "off"
+          }
+        )
+      }
+    ),
+    selectedProduct && /* @__PURE__ */ jsx(Card, { padding: "400", children: /* @__PURE__ */ jsxs(InlineStack, { gap: "400", align: "space-between", blockAlign: "center", children: [
+      /* @__PURE__ */ jsxs(InlineStack, { gap: "300", align: "start", blockAlign: "center", children: [
+        selectedProduct.featuredImage?.url && /* @__PURE__ */ jsx(
+          Thumbnail,
+          {
+            source: selectedProduct.featuredImage.url,
+            alt: selectedProduct.title,
+            size: "medium"
+          }
+        ),
+        /* @__PURE__ */ jsxs(BlockStack, { gap: "200", children: [
+          /* @__PURE__ */ jsx(Text, { as: "h4", variant: "bodyMd", fontWeight: "semibold", children: selectedProduct.title }),
+          /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", tone: "subdued", children: [
+            "Handle: /",
+            selectedProduct.handle
+          ] }),
+          /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", tone: "subdued", children: [
+            "ID: ",
+            selectedProduct.id.replace("gid://shopify/Product/", "")
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "end", blockAlign: "center", children: [
+        /* @__PURE__ */ jsx(Badge, { tone: "success", icon: CheckIcon, children: "Selected" }),
+        /* @__PURE__ */ jsx(
+          Button,
+          {
+            variant: "plain",
+            size: "micro",
+            onClick: () => {
+              onSelect(null);
+              setSearchValue("");
+            },
+            children: "Change"
+          }
+        )
+      ] })
+    ] }) }),
+    !selectedProduct && products.length === 0 && /* @__PURE__ */ jsx(Banner, { tone: "info", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "200", children: [
+      /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", children: [
+        /* @__PURE__ */ jsx("strong", { children: "No products found." }),
+        " Make sure you have products in your Shopify store."
+      ] }),
+      /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", children: "You can import products from your admin dashboard or create them manually." })
+    ] }) }),
+    searchValue && !loading && products.length > 0 && productOptions.length === 0 && /* @__PURE__ */ jsx(Banner, { tone: "warning", children: /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", children: [
+      /* @__PURE__ */ jsxs("strong", { children: [
+        'No matches for "',
+        searchValue,
+        '".'
+      ] }),
+      " Try searching by product name, SKU, or handle."
+    ] }) })
+  ] });
+}
+
+const PRODUCTS_QUERY = `#graphql
+  query ProductsQuery($query: String, $first: Int!) {
+    products(first: $first, query: $query) {
+      edges {
+        node {
+          id
+          title
+          handle
+          featuredImage {
+            url
+            altText
+          }
+        }
+      }
+    }
+  }
+`;
+const METAFIELDS_SET_MUTATION = `#graphql
+  mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) {
+      metafields {
+        id
+        namespace
+        key
+        value
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }
+`;
+const loader$4 = async ({ request }) => {
+  const { admin } = await authenticate.admin(request);
+  const url = new URL(request.url);
+  const searchQuery = url.searchParams.get("search") || "";
+  const response = await admin.graphql(PRODUCTS_QUERY, {
+    variables: {
+      query: searchQuery ? `title:*${searchQuery}*` : "",
+      first: 25
+    }
+  });
+  const data = await response.json();
+  const products = data.data?.products?.edges?.map((edge) => edge.node) || [];
+  return json({ products });
+};
+const action$2 = async ({ request }) => {
+  const { admin } = await authenticate.admin(request);
+  const contentType = request.headers.get("content-type") || "";
+  let formData;
+  if (contentType.includes("multipart/form-data")) {
+    const uploadHandler = unstable_createMemoryUploadHandler({
+      maxPartSize: 2e7
+      // 20MB max
+    });
+    formData = await unstable_parseMultipartFormData(request, uploadHandler);
+  } else {
+    formData = await request.formData();
+  }
+  const intent = formData.get("intent");
+  if (intent === "extract-pdf") {
+    const file = formData.get("pdf");
+    const fileValidation = await validatePdfFile(file);
+    if (!fileValidation.ok) {
+      return json({ error: fileValidation.error }, { status: 400 });
+    }
+    try {
+      const arrayBuffer = await fileValidation.file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const pdfResult = await parsePdf(buffer);
+      const result = await extractProductContent(pdfResult.text);
+      return json({
+        extracted: result,
+        source: {
+          type: "pdf",
+          filename: fileValidation.file.name,
+          pages: pdfResult.numPages
+        }
+      });
+    } catch (error) {
+      console.error("PDF extraction error:", error);
+      const userError = asUserError(error, {
+        code: "pdf.processing_failed",
+        message: "Failed to process PDF",
+        suggestion: "Try a different PDF or paste specs directly."
+      });
+      return json({ error: userError }, { status: 500 });
+    }
+  }
+  if (intent === "extract-url") {
+    const urlInput = formData.get("url");
+    const urlValidation = validateUrlInput(urlInput);
+    if (!urlValidation.ok) {
+      return json({ error: urlValidation.error }, { status: 400 });
+    }
+    try {
+      const scrapeResult = await scrapeProductPage(urlValidation.value);
+      const result = await extractProductContent(scrapeResult.text);
+      return json({
+        extracted: result,
+        source: {
+          type: "url",
+          url: scrapeResult.url,
+          title: scrapeResult.title,
+          manufacturer: scrapeResult.manufacturer
+        }
+      });
+    } catch (error) {
+      console.error("URL scraping error:", error);
+      const userError = asUserError(error, {
+        code: "url.processing_failed",
+        message: "Failed to scrape URL",
+        suggestion: "Check the URL or try again later."
+      });
+      return json({ error: userError }, { status: 500 });
+    }
+  }
+  if (intent === "extract") {
+    const textInput = formData.get("text");
+    const textValidation = validateTextInput(textInput);
+    if (!textValidation.ok) {
+      return json({ error: textValidation.error }, { status: 400 });
+    }
+    try {
+      const result = await extractProductContent(textValidation.value);
+      return json({ extracted: result, source: { type: "text" } });
+    } catch (error) {
+      console.error("Text extraction error:", error);
+      const userError = asUserError(error, {
+        code: "text.processing_failed",
+        message: "Failed to extract content from text",
+        suggestion: "Try different text or check your internet connection."
+      });
+      return json({ error: userError }, { status: 500 });
+    }
+  }
+  if (intent === "save") {
+    const productId = formData.get("productId");
+    const contentJson = formData.get("content");
+    if (!productId) {
+      return json({
+        error: {
+          code: "save.no_product",
+          message: "No product selected.",
+          suggestion: "Select a product in Step 1 before saving."
+        }
+      }, { status: 400 });
+    }
+    if (!contentJson) {
+      return json({
+        error: {
+          code: "save.no_content",
+          message: "No content to save.",
+          suggestion: "Extract content first before saving."
+        }
+      }, { status: 400 });
+    }
+    try {
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(contentJson);
+      } catch {
+        return json({
+          error: {
+            code: "save.invalid_json",
+            message: "Content data is corrupted.",
+            suggestion: "Re-extract content and try saving again."
+          }
+        }, { status: 400 });
+      }
+      const contentValidation = validateContentPayload(parsedContent);
+      if (!contentValidation.ok) {
+        return json({ error: contentValidation.error }, { status: 400 });
+      }
+      const content = contentValidation.value;
+      const metafields = [
+        {
+          ownerId: productId,
+          namespace: "product_bridge",
+          key: "specs",
+          type: "json",
+          value: JSON.stringify(content.specs)
+        },
+        {
+          ownerId: productId,
+          namespace: "product_bridge",
+          key: "highlights",
+          type: "json",
+          value: JSON.stringify(content.highlights)
+        },
+        {
+          ownerId: productId,
+          namespace: "product_bridge",
+          key: "included",
+          type: "json",
+          value: JSON.stringify(content.included)
+        },
+        {
+          ownerId: productId,
+          namespace: "product_bridge",
+          key: "featured",
+          type: "json",
+          value: JSON.stringify(content.featured)
+        }
+      ];
+      const shopifyResult = await retryShopify(
+        () => admin.graphql(METAFIELDS_SET_MUTATION, {
+          variables: { metafields }
+        })
+      );
+      if (!shopifyResult.success) {
+        const userError = {
+          code: "save.shopify_failed",
+          message: "Failed to save to Shopify after retries.",
+          suggestion: "Check your connection and try again."
+        };
+        throw userError;
+      }
+      const response = shopifyResult.data;
+      const result = await response.json();
+      const errors = result.data?.metafieldsSet?.userErrors;
+      if (errors?.length > 0) {
+        const errorMessages = errors.map((e) => e.message).join(", ");
+        return json({
+          error: {
+            code: "save.shopify_error",
+            message: `Shopify rejected the metafields: ${errorMessages}`,
+            suggestion: "Check that all fields contain valid values and try again."
+          }
+        }, { status: 400 });
+      }
+      return json({ success: true, saved: result.data?.metafieldsSet?.metafields });
+    } catch (error) {
+      console.error("Save error:", error);
+      const userError = asUserError(error, {
+        code: "save.failed",
+        message: "Failed to save metafields",
+        suggestion: "Check your connection and try again."
+      });
+      return json({ error: userError }, { status: 500 });
+    }
+  }
+  return json({ error: "Invalid intent" }, { status: 400 });
+};
+function AppIndex() {
+  const { products } = useLoaderData();
+  const fetcher = useFetcher();
+  useRef(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [specsText, setSpecsText] = useState("");
+  const [content, setContent] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [inputMethod, setInputMethod] = useState("text");
+  const [urlValue, setUrlValue] = useState("");
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [sourceInfo, setSourceInfo] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const isExtracting = fetcher.state === "submitting" && (fetcher.formData?.get("intent") === "extract" || fetcher.formData?.get("intent") === "extract-pdf" || fetcher.formData?.get("intent") === "extract-url");
+  const isSaving = fetcher.state === "submitting" && fetcher.formData?.get("intent") === "save";
+  const extractResult = fetcher.data;
+  const getStepState = (step) => {
+    if (step < currentStep) return "complete";
+    if (step === currentStep) return "active";
+    return "inactive";
+  };
+  const steps = [
+    { title: "Select Product", description: "Choose which product to enhance" },
+    { title: "Import Specs", description: "Extract content with AI" },
+    { title: "Review & Save", description: "Edit and save to metafields" }
+  ];
+  useEffect(() => {
+    if (extractResult?.extracted) {
+      setContent(extractResult.extracted);
+      if (extractResult.source) {
+        setSourceInfo(extractResult.source);
+      }
+      setCurrentStep(3);
+    }
+  }, [extractResult]);
+  useEffect(() => {
+    if (selectedProduct && currentStep === 1) {
+      setCurrentStep(2);
+    }
+  }, [selectedProduct]);
+  const handleFileDrop = useCallback((_dropFiles, acceptedFiles) => {
+    if (acceptedFiles.length > 0) {
+      setUploadedFile(acceptedFiles[0]);
+    }
+  }, []);
+  const handlePdfExtract = () => {
+    if (!uploadedFile) return;
+    const formData = new FormData();
+    formData.append("intent", "extract-pdf");
+    formData.append("pdf", uploadedFile);
+    fetcher.submit(formData, {
+      method: "post",
+      encType: "multipart/form-data"
+    });
+  };
+  const handleUrlExtract = () => {
+    if (!urlValue.trim()) return;
+    const formData = new FormData();
+    formData.append("intent", "extract-url");
+    formData.append("url", urlValue.trim());
+    fetcher.submit(formData, { method: "post" });
+  };
+  const updateHighlight = (index, value) => {
+    if (!content) return;
+    const newHighlights = [...content.highlights];
+    newHighlights[index] = value;
+    setContent({ ...content, highlights: newHighlights });
+  };
+  const removeHighlight = (index) => {
+    if (!content) return;
+    setContent({ ...content, highlights: content.highlights.filter((_, i) => i !== index) });
+  };
+  const addHighlight = () => {
+    if (!content) return;
+    setContent({ ...content, highlights: [...content.highlights, ""] });
+  };
+  const updateFeatured = (index, field, value) => {
+    if (!content) return;
+    const newFeatured = [...content.featured];
+    newFeatured[index] = { ...newFeatured[index], [field]: value };
+    setContent({ ...content, featured: newFeatured });
+  };
+  const removeFeatured = (index) => {
+    if (!content) return;
+    setContent({ ...content, featured: content.featured.filter((_, i) => i !== index) });
+  };
+  const addFeatured = () => {
+    if (!content) return;
+    setContent({ ...content, featured: [...content.featured, { title: "", value: "" }] });
+  };
+  const updateIncluded = (index, field, value) => {
+    if (!content) return;
+    const newIncluded = [...content.included];
+    newIncluded[index] = { ...newIncluded[index], [field]: value };
+    setContent({ ...content, included: newIncluded });
+  };
+  const removeIncluded = (index) => {
+    if (!content) return;
+    setContent({ ...content, included: content.included.filter((_, i) => i !== index) });
+  };
+  const addIncluded = () => {
+    if (!content) return;
+    setContent({ ...content, included: [...content.included, { title: "", link: "" }] });
+  };
+  const updateSpecLine = (groupIndex, lineIndex, field, value) => {
+    if (!content) return;
+    const newSpecs = [...content.specs];
+    newSpecs[groupIndex] = {
+      ...newSpecs[groupIndex],
+      lines: newSpecs[groupIndex].lines.map(
+        (line, i) => i === lineIndex ? { ...line, [field]: value } : line
+      )
+    };
+    setContent({ ...content, specs: newSpecs });
+  };
+  const removeSpecLine = (groupIndex, lineIndex) => {
+    if (!content) return;
+    const newSpecs = [...content.specs];
+    newSpecs[groupIndex] = {
+      ...newSpecs[groupIndex],
+      lines: newSpecs[groupIndex].lines.filter((_, i) => i !== lineIndex)
+    };
+    setContent({ ...content, specs: newSpecs });
+  };
+  const handleSave = () => {
+    if (!selectedProduct || !content) return;
+    const formData = new FormData();
+    formData.append("intent", "save");
+    formData.append("productId", selectedProduct.id);
+    formData.append("content", JSON.stringify(content));
+    fetcher.submit(formData, { method: "post" });
+  };
+  return /* @__PURE__ */ jsx(
+    Page,
+    {
+      title: "Product Bridge",
+      subtitle: "AI-powered product content automation",
+      primaryAction: /* @__PURE__ */ jsx(InlineStack, { gap: "200", children: /* @__PURE__ */ jsx(Badge, { tone: "info", icon: MagicIcon, children: "AI-Powered" }) }),
+      children: /* @__PURE__ */ jsxs(BlockStack, { gap: "500", children: [
+        /* @__PURE__ */ jsx(ProgressIndicator, { current: currentStep, steps }),
+        extractResult?.success && /* @__PURE__ */ jsx(
+          Banner,
+          {
+            title: "Metafields saved successfully!",
+            tone: "success",
+            onDismiss: () => {
+            }
+          }
+        ),
+        extractResult?.error && /* @__PURE__ */ jsx(
+          Banner,
+          {
+            title: "Error",
+            tone: "critical",
+            children: extractResult.error
+          }
+        ),
+        /* @__PURE__ */ jsx(
+          StepCard,
+          {
+            step: 1,
+            title: "Select Product",
+            description: "Choose which product to enhance with AI-extracted content",
+            state: getStepState(1),
+            children: /* @__PURE__ */ jsx(
+              ProductSelector,
+              {
+                products,
+                selectedProduct,
+                onSelect: setSelectedProduct
+              }
+            )
+          }
+        ),
+        /* @__PURE__ */ jsx(
+          StepCard,
+          {
+            step: 2,
+            title: "Import Product Specs",
+            description: "Choose how to provide product information",
+            state: getStepState(2),
+            disabled: !selectedProduct,
+            children: /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
+              /* @__PURE__ */ jsxs(InlineStack, { gap: "300", children: [
+                /* @__PURE__ */ jsx(
+                  MethodCard,
+                  {
+                    icon: NoteIcon,
+                    title: "Paste Text",
+                    description: "Copy specs from manufacturer websites",
+                    active: inputMethod === "text",
+                    onClick: () => setInputMethod("text")
+                  }
+                ),
+                /* @__PURE__ */ jsx(
+                  MethodCard,
+                  {
+                    icon: FileIcon,
+                    title: "Upload PDF",
+                    description: "Extract from brochures and spec sheets",
+                    active: inputMethod === "pdf",
+                    onClick: () => setInputMethod("pdf"),
+                    supportedFormats: [".pdf", "up to 20MB"]
+                  }
+                ),
+                /* @__PURE__ */ jsx(
+                  MethodCard,
+                  {
+                    icon: GlobeIcon,
+                    title: "Scrape URL",
+                    description: "Auto-extract from manufacturer pages",
+                    active: inputMethod === "url",
+                    onClick: () => setInputMethod("url"),
+                    supportedSites: ["Canon", "Sony", "Nikon", "+8 more"]
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsxs(Box, { paddingBlockStart: "300", children: [
+                inputMethod === "text" && /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
+                  /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "Raw specs from manufacturer",
+                      multiline: 8,
+                      value: specsText,
+                      onChange: setSpecsText,
+                      placeholder: "Paste the full specification sheet from the manufacturer website...",
+                      autoComplete: "off"
+                    }
+                  ),
+                  /* @__PURE__ */ jsxs(fetcher.Form, { method: "post", children: [
+                    /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: "extract" }),
+                    /* @__PURE__ */ jsx("input", { type: "hidden", name: "text", value: specsText }),
+                    /* @__PURE__ */ jsx(
+                      Button,
+                      {
+                        variant: "primary",
+                        submit: true,
+                        loading: isExtracting && fetcher.formData?.get("intent") === "extract",
+                        disabled: !specsText.trim(),
+                        icon: MagicIcon,
+                        children: "Extract Content with AI"
+                      }
+                    )
+                  ] })
+                ] }),
+                inputMethod === "pdf" && /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
+                  /* @__PURE__ */ jsx(
+                    DropZone,
+                    {
+                      onDrop: handleFileDrop,
+                      accept: ".pdf,application/pdf",
+                      type: "file",
+                      allowMultiple: false,
+                      children: uploadedFile ? /* @__PURE__ */ jsxs(BlockStack, { gap: "200", inlineAlign: "center", children: [
+                        /* @__PURE__ */ jsx(Icon, { source: ImportIcon, tone: "success" }),
+                        /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodyMd", fontWeight: "semibold", children: uploadedFile.name }),
+                        /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", tone: "subdued", children: [
+                          (uploadedFile.size / 1024 / 1024).toFixed(2),
+                          " MB"
+                        ] }),
+                        /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: () => setUploadedFile(null), children: "Remove" })
+                      ] }) : /* @__PURE__ */ jsx(DropZone.FileUpload, { actionTitle: "Upload PDF", actionHint: "or drag and drop" })
+                    }
+                  ),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      variant: "primary",
+                      onClick: handlePdfExtract,
+                      loading: isExtracting && fetcher.formData?.get("intent") === "extract-pdf",
+                      disabled: !uploadedFile,
+                      icon: MagicIcon,
+                      children: "Extract Content from PDF"
+                    }
+                  ),
+                  /* @__PURE__ */ jsx(Banner, { tone: "info", children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", children: "Upload manufacturer spec sheets or product brochures. Works best with text-based PDFs." }) })
+                ] }),
+                inputMethod === "url" && /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
+                  /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "Manufacturer product page URL",
+                      value: urlValue,
+                      onChange: setUrlValue,
+                      placeholder: "https://www.usa.canon.com/shop/p/eos-r5-mark-ii",
+                      autoComplete: "off",
+                      prefix: /* @__PURE__ */ jsx(Icon, { source: LinkIcon })
+                    }
+                  ),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      variant: "primary",
+                      onClick: handleUrlExtract,
+                      loading: isExtracting && fetcher.formData?.get("intent") === "extract-url",
+                      disabled: !urlValue.trim(),
+                      icon: MagicIcon,
+                      children: "Scrape & Extract Content"
+                    }
+                  ),
+                  /* @__PURE__ */ jsx(Banner, { tone: "info", children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", children: "Supported manufacturers: Canon, Sony, Nikon, Fujifilm, Panasonic, Leica, and more." }) })
+                ] })
+              ] }),
+              isExtracting && /* @__PURE__ */ jsx(
+                ExtractionProgress,
+                {
+                  isActive: isExtracting,
+                  stages: [
+                    { name: "Reading content", duration: 2e3 },
+                    { name: "AI analysis", duration: 3e3 },
+                    { name: "Structuring data", duration: 1e3 }
+                  ],
+                  insights: [
+                    "Analyzing content structure...",
+                    "Identifying key specifications...",
+                    "Organizing product highlights...",
+                    "Extracting included items..."
+                  ]
+                }
+              ),
+              sourceInfo && content && /* @__PURE__ */ jsx(Banner, { tone: "success", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
+                /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", fontWeight: "semibold", children: "✨ Content extracted successfully!" }),
+                sourceInfo.type === "pdf" && /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", children: [
+                  "Source: ",
+                  sourceInfo.filename,
+                  " (",
+                  sourceInfo.pages,
+                  " pages)"
+                ] }),
+                sourceInfo.type === "url" && /* @__PURE__ */ jsxs(Text, { as: "p", variant: "bodySm", children: [
+                  "Source: ",
+                  sourceInfo.title || sourceInfo.url,
+                  sourceInfo.manufacturer && ` (${sourceInfo.manufacturer})`
+                ] })
+              ] }) })
+            ] })
+          }
+        ),
+        /* @__PURE__ */ jsx(
+          StepCard,
+          {
+            step: 3,
+            title: "Review & Edit Content",
+            description: "Fine-tune the AI-extracted content before saving",
+            state: getStepState(3),
+            disabled: !content,
+            children: content && /* @__PURE__ */ jsxs(BlockStack, { gap: "500", children: [
+              /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
+                /* @__PURE__ */ jsx(Text, { as: "h3", variant: "headingMd", children: "Extracted Content" }),
+                /* @__PURE__ */ jsxs(InlineStack, { gap: "200", children: [
+                  /* @__PURE__ */ jsx(Button, { variant: "tertiary", onClick: () => setShowPreview(true), children: "Preview JSON" }),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      variant: "primary",
+                      onClick: handleSave,
+                      loading: isSaving,
+                      disabled: !selectedProduct,
+                      icon: CheckIcon,
+                      children: "Save to Product Metafields"
+                    }
+                  )
+                ] })
+              ] }),
+              /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+                /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
+                  /* @__PURE__ */ jsxs(Text, { as: "h4", variant: "headingSm", children: [
+                    "Product Highlights (",
+                    content.highlights.length,
+                    ")"
+                  ] }),
+                  /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: addHighlight, icon: PlusIcon, children: "Add Highlight" })
+                ] }),
+                content.highlights.length === 0 ? /* @__PURE__ */ jsx(
+                  Box,
+                  {
+                    padding: "400",
+                    background: "bg-fill-tertiary",
+                    borderRadius: "base",
+                    children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", alignment: "center", children: 'No highlights extracted. Click "Add Highlight" to create one manually.' })
+                  }
+                ) : content.highlights.map((highlight, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
+                  /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "",
+                      labelHidden: true,
+                      value: highlight,
+                      onChange: (v) => updateHighlight(index, v),
+                      autoComplete: "off"
+                    }
+                  ) }),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      variant: "plain",
+                      tone: "critical",
+                      onClick: () => removeHighlight(index),
+                      icon: DeleteIcon,
+                      accessibilityLabel: "Remove highlight"
+                    }
+                  )
+                ] }, index))
+              ] }) }),
+              /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+                /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
+                  /* @__PURE__ */ jsxs(Text, { as: "h4", variant: "headingSm", children: [
+                    "Featured Specifications (",
+                    content.featured.length,
+                    ")"
+                  ] }),
+                  /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: addFeatured, icon: PlusIcon, children: "Add Spec" })
+                ] }),
+                content.featured.length === 0 ? /* @__PURE__ */ jsx(
+                  Box,
+                  {
+                    padding: "400",
+                    background: "bg-fill-tertiary",
+                    borderRadius: "base",
+                    children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", alignment: "center", children: "No featured specs extracted. These are key specs shown prominently." })
+                  }
+                ) : content.featured.map((spec, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "end", children: [
+                  /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "Specification",
+                      value: spec.title,
+                      onChange: (v) => updateFeatured(index, "title", v),
+                      autoComplete: "off"
+                    }
+                  ) }),
+                  /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "Value",
+                      value: spec.value,
+                      onChange: (v) => updateFeatured(index, "value", v),
+                      autoComplete: "off"
+                    }
+                  ) }),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      variant: "plain",
+                      tone: "critical",
+                      onClick: () => removeFeatured(index),
+                      icon: DeleteIcon,
+                      accessibilityLabel: "Remove featured spec"
+                    }
+                  )
+                ] }, index))
+              ] }) }),
+              /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+                /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", children: [
+                  /* @__PURE__ */ jsxs(Text, { as: "h4", variant: "headingSm", children: [
+                    "What's Included (",
+                    content.included.length,
+                    ")"
+                  ] }),
+                  /* @__PURE__ */ jsx(Button, { variant: "plain", onClick: addIncluded, icon: PlusIcon, children: "Add Item" })
+                ] }),
+                content.included.length === 0 ? /* @__PURE__ */ jsx(
+                  Box,
+                  {
+                    padding: "400",
+                    background: "bg-fill-tertiary",
+                    borderRadius: "base",
+                    children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", alignment: "center", children: "No included items found. List accessories and components included with the product." })
+                  }
+                ) : content.included.map((item, index) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "end", children: [
+                  /* @__PURE__ */ jsx("div", { style: { flex: 2 }, children: /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "Item",
+                      value: item.title,
+                      onChange: (v) => updateIncluded(index, "title", v),
+                      autoComplete: "off"
+                    }
+                  ) }),
+                  /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
+                    TextField,
+                    {
+                      label: "Link (optional)",
+                      value: item.link,
+                      onChange: (v) => updateIncluded(index, "link", v),
+                      autoComplete: "off",
+                      placeholder: "/products/..."
+                    }
+                  ) }),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      variant: "plain",
+                      tone: "critical",
+                      onClick: () => removeIncluded(index),
+                      icon: DeleteIcon,
+                      accessibilityLabel: "Remove included item"
+                    }
+                  )
+                ] }, index))
+              ] }) }),
+              /* @__PURE__ */ jsx(Card, { children: /* @__PURE__ */ jsxs(BlockStack, { gap: "400", children: [
+                /* @__PURE__ */ jsxs(Text, { as: "h4", variant: "headingSm", children: [
+                  "Detailed Specifications (",
+                  content.specs.length,
+                  " groups)"
+                ] }),
+                content.specs.length === 0 ? /* @__PURE__ */ jsx(
+                  Box,
+                  {
+                    padding: "400",
+                    background: "bg-fill-tertiary",
+                    borderRadius: "base",
+                    children: /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", alignment: "center", children: "No specifications extracted. The detailed tech specs will appear here." })
+                  }
+                ) : content.specs.map((group, groupIndex) => /* @__PURE__ */ jsx(Card, { background: "bg-surface-secondary", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
+                  /* @__PURE__ */ jsx(Text, { as: "h5", variant: "bodyMd", fontWeight: "semibold", children: group.heading }),
+                  group.lines.map((line, lineIndex) => /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "end", children: [
+                    /* @__PURE__ */ jsx("div", { style: { flex: 1 }, children: /* @__PURE__ */ jsx(
+                      TextField,
+                      {
+                        label: "Specification",
+                        labelHidden: true,
+                        value: line.title,
+                        onChange: (v) => updateSpecLine(groupIndex, lineIndex, "title", v),
+                        autoComplete: "off",
+                        size: "slim"
+                      }
+                    ) }),
+                    /* @__PURE__ */ jsx("div", { style: { flex: 2 }, children: /* @__PURE__ */ jsx(
+                      TextField,
+                      {
+                        label: "Value",
+                        labelHidden: true,
+                        value: line.text,
+                        onChange: (v) => updateSpecLine(groupIndex, lineIndex, "text", v),
+                        autoComplete: "off",
+                        size: "slim"
+                      }
+                    ) }),
+                    /* @__PURE__ */ jsx(
+                      Button,
+                      {
+                        variant: "plain",
+                        tone: "critical",
+                        onClick: () => removeSpecLine(groupIndex, lineIndex),
+                        icon: DeleteIcon,
+                        accessibilityLabel: "Remove specification"
+                      }
+                    )
+                  ] }, lineIndex))
+                ] }) }, groupIndex))
+              ] }) }),
+              !selectedProduct && /* @__PURE__ */ jsx(Banner, { tone: "warning", children: "Please select a product in Step 1 before saving." })
+            ] })
+          }
+        ),
+        /* @__PURE__ */ jsx(
+          Modal,
+          {
+            open: showPreview,
+            onClose: () => setShowPreview(false),
+            title: "JSON Preview",
+            children: /* @__PURE__ */ jsx(Modal.Section, { children: /* @__PURE__ */ jsx("pre", { style: {
+              fontSize: "12px",
+              overflow: "auto",
+              maxHeight: "500px",
+              background: "#f6f6f7",
+              padding: "16px",
+              borderRadius: "8px",
+              border: "1px solid #e1e3e5"
+            }, children: JSON.stringify(content, null, 2) }) })
+          }
+        )
+      ] })
+    }
+  );
+}
 function ErrorBoundary$1() {
   const error = useRouteError();
   const getErrorInfo = () => {
@@ -1548,7 +2917,7 @@ function ErrorBoundary$1() {
   return /* @__PURE__ */ jsx(Page, { title: "Product Bridge", children: /* @__PURE__ */ jsx(Banner, { tone: "critical", title: message, children: suggestion }) });
 }
 
-const route2 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route3 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   ErrorBoundary: ErrorBoundary$1,
   action: action$2,
@@ -1999,7 +3368,7 @@ function Auth() {
   ] }) }) }) }) });
 }
 
-const route3 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route4 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   action: action$1,
   default: Auth,
@@ -2023,7 +3392,7 @@ const action = async ({ request }) => {
   throw new Response();
 };
 
-const route4 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   action
 }, Symbol.toStringTag, { value: 'Module' }));
@@ -2036,7 +3405,7 @@ const loader$2 = async ({ request }) => {
   return login(request);
 };
 
-const route5 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route6 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$2
 }, Symbol.toStringTag, { value: 'Module' }));
@@ -2046,7 +3415,7 @@ const loader$1 = async ({ request }) => {
   return null;
 };
 
-const route6 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route7 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   loader: loader$1
 }, Symbol.toStringTag, { value: 'Module' }));
@@ -2069,7 +3438,7 @@ const headers = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
 
-const route7 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+const route8 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   ErrorBoundary,
   default: App,
@@ -2077,7 +3446,7 @@ const route7 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   loader
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','imports':['/assets/components-bfDKBDPN.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-DHzqGsh7.js','imports':['/assets/components-bfDKBDPN.js'],'css':[]},'routes/api.extract':{'id':'routes/api.extract','parentId':'root','path':'api/extract','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.extract-l0sNRNKZ.js','imports':[],'css':[]},'routes/app._index':{'id':'routes/app._index','parentId':'routes/app','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index-LAMYE4sL.js','imports':['/assets/components-bfDKBDPN.js','/assets/Page-BapPfwum.js','/assets/context-fvRqhjvj.js'],'css':[]},'routes/auth.login':{'id':'routes/auth.login','parentId':'root','path':'auth/login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/route-DC0inYcF.js','imports':['/assets/components-bfDKBDPN.js','/assets/en-lBrUGu9Q.js','/assets/Page-BapPfwum.js','/assets/context-fvRqhjvj.js'],'css':[]},'routes/webhooks':{'id':'routes/webhooks','parentId':'root','path':'webhooks','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webhooks-l0sNRNKZ.js','imports':[],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-l0sNRNKZ.js','imports':[],'css':[]},'routes/auth.$':{'id':'routes/auth.$','parentId':'root','path':'auth/*','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/auth._-l0sNRNKZ.js','imports':[],'css':[]},'routes/app':{'id':'routes/app','parentId':'root','path':'app','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app-CD3ikEgN.js','imports':['/assets/components-bfDKBDPN.js','/assets/en-lBrUGu9Q.js','/assets/context-fvRqhjvj.js'],'css':[]}},'url':'/assets/manifest-f226d393.js','version':'f226d393'};
+const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','imports':['/assets/components-DKwNRbqV.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-B4Pd06ft.js','imports':['/assets/components-DKwNRbqV.js'],'css':['/assets/root-DgT1QTbr.css']},'routes/app._index.original':{'id':'routes/app._index.original','parentId':'routes/app._index','path':'original','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index.original-B4Nyuu1u.js','imports':['/assets/components-DKwNRbqV.js','/assets/SearchIcon.svg-sR3tMc0V.js','/assets/Page-P-8IetFp.js','/assets/context-BRhAIWmx.js','/assets/FormLayout-CLAstZ-x.js'],'css':[]},'routes/api.extract':{'id':'routes/api.extract','parentId':'root','path':'api/extract','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.extract-l0sNRNKZ.js','imports':[],'css':[]},'routes/app._index':{'id':'routes/app._index','parentId':'routes/app','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index-DKCk-dd-.js','imports':['/assets/components-DKwNRbqV.js','/assets/Page-P-8IetFp.js','/assets/SearchIcon.svg-sR3tMc0V.js','/assets/context-BRhAIWmx.js'],'css':[]},'routes/auth.login':{'id':'routes/auth.login','parentId':'root','path':'auth/login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/route-DACMr74n.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/Page-P-8IetFp.js','/assets/FormLayout-CLAstZ-x.js','/assets/context-BRhAIWmx.js'],'css':[]},'routes/webhooks':{'id':'routes/webhooks','parentId':'root','path':'webhooks','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webhooks-l0sNRNKZ.js','imports':[],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-l0sNRNKZ.js','imports':[],'css':[]},'routes/auth.$':{'id':'routes/auth.$','parentId':'root','path':'auth/*','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/auth._-l0sNRNKZ.js','imports':[],'css':[]},'routes/app':{'id':'routes/app','parentId':'root','path':'app','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app-1Wf0Ek65.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/context-BRhAIWmx.js'],'css':[]}},'url':'/assets/manifest-66af95d6.js','version':'66af95d6'};
 
 /**
        * `mode` is only relevant for the old Remix compiler but
@@ -2099,13 +3468,21 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           caseSensitive: undefined,
           module: route0
         },
+  "routes/app._index.original": {
+          id: "routes/app._index.original",
+          parentId: "routes/app._index",
+          path: "original",
+          index: undefined,
+          caseSensitive: undefined,
+          module: route1
+        },
   "routes/api.extract": {
           id: "routes/api.extract",
           parentId: "root",
           path: "api/extract",
           index: undefined,
           caseSensitive: undefined,
-          module: route1
+          module: route2
         },
   "routes/app._index": {
           id: "routes/app._index",
@@ -2113,7 +3490,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           path: undefined,
           index: true,
           caseSensitive: undefined,
-          module: route2
+          module: route3
         },
   "routes/auth.login": {
           id: "routes/auth.login",
@@ -2121,7 +3498,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           path: "auth/login",
           index: undefined,
           caseSensitive: undefined,
-          module: route3
+          module: route4
         },
   "routes/webhooks": {
           id: "routes/webhooks",
@@ -2129,7 +3506,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           path: "webhooks",
           index: undefined,
           caseSensitive: undefined,
-          module: route4
+          module: route5
         },
   "routes/_index": {
           id: "routes/_index",
@@ -2137,7 +3514,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           path: undefined,
           index: true,
           caseSensitive: undefined,
-          module: route5
+          module: route6
         },
   "routes/auth.$": {
           id: "routes/auth.$",
@@ -2145,7 +3522,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           path: "auth/*",
           index: undefined,
           caseSensitive: undefined,
-          module: route6
+          module: route7
         },
   "routes/app": {
           id: "routes/app",
@@ -2153,7 +3530,7 @@ const serverManifest = {'entry':{'module':'/assets/entry.client-Cl0odWUN.js','im
           path: "app",
           index: undefined,
           caseSensitive: undefined,
-          module: route7
+          module: route8
         }
       };
 
