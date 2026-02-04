@@ -1,5 +1,4 @@
 import { InlineStack, Text, Box } from "@shopify/polaris";
-import { CheckIcon } from "@shopify/polaris-icons";
 
 interface ProgressIndicatorProps {
   current: number;
@@ -22,33 +21,31 @@ export function ProgressIndicator({ current, steps }: ProgressIndicatorProps) {
           return (
             <InlineStack key={index} gap="200" align="center" blockAlign="center">
               {/* Step Circle */}
-              <Box
-                background={isActive ? "bg-fill-emphasis" : isComplete ? "bg-fill-success" : "bg-fill-tertiary"}
-                padding="100"
-                borderRadius="full"
-                width="32px"
-                height="32px"
-                minHeight="32px"
-                minWidth="32px"
-                position="relative"
-              >
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  width: '100%',
-                  height: '100%',
-                  color: isActive || isComplete ? '#fff' : '#6b7280',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}>
-                  {isComplete ? (
-                    <CheckIcon />
-                  ) : (
-                    stepNumber
-                  )}
-                </div>
-              </Box>
+              <div style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: isActive 
+                  ? 'var(--p-color-bg-fill-brand)' 
+                  : isComplete 
+                    ? 'var(--p-color-bg-fill-success)' 
+                    : 'var(--p-color-bg-fill-secondary)',
+                color: isActive || isComplete ? '#fff' : 'var(--p-color-text-secondary)',
+                fontSize: '13px',
+                fontWeight: '600',
+                flexShrink: 0
+              }}>
+                {isComplete ? (
+                  <svg viewBox="0 0 20 20" width="14" height="14" fill="currentColor">
+                    <path d="M8.72 13.78a.75.75 0 0 1-1.06 0l-3.22-3.22a.75.75 0 0 1 1.06-1.06l2.69 2.69 5.47-5.47a.75.75 0 0 1 1.06 1.06l-6 6Z"/>
+                  </svg>
+                ) : (
+                  stepNumber
+                )}
+              </div>
 
               {/* Step Text */}
               <Box>

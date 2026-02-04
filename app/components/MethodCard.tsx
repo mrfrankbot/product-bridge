@@ -39,20 +39,19 @@ export function MethodCard({
         <BlockStack gap="300">
           {/* Icon and Title */}
           <InlineStack gap="200" align="start" blockAlign="center">
-            <Box
-              background={active ? "bg-fill-emphasis" : "bg-fill-tertiary"}
-              padding="200"
-              borderRadius="base"
-            >
-              <div style={{ 
-                color: active ? '#fff' : '#6b7280',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Icon source={icon} />
-              </div>
-            </Box>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: active 
+                ? 'var(--p-color-bg-fill-brand)' 
+                : 'var(--p-color-bg-fill-secondary)'
+            }}>
+              <Icon source={icon} tone={active ? "textInverse" : "subdued"} />
+            </div>
             
             <BlockStack gap="100">
               <Text 

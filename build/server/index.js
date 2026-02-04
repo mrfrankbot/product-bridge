@@ -6,7 +6,7 @@ import * as isbotModule from 'isbot';
 import { renderToPipeableStream } from 'react-dom/server';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Thumbnail, Page, BlockStack, Banner, Card, Text, Autocomplete, Icon, InlineStack, Badge, Tabs, TextField, Button, DropZone, Divider, Modal, Box, ProgressBar, Spinner, AppProvider, FormLayout } from '@shopify/polaris';
-import { SearchIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, MagicIcon, NoteIcon, FileIcon, GlobeIcon } from '@shopify/polaris-icons';
+import { SearchIcon, ImportIcon, LinkIcon, PlusIcon, DeleteIcon, CheckIcon, ChevronDownIcon, ChevronRightIcon, NoteIcon, FileIcon, GlobeIcon, MagicIcon } from '@shopify/polaris-icons';
 import '@shopify/shopify-app-remix/adapters/node';
 import { shopifyApp, AppDistribution, LATEST_API_VERSION, boundary } from '@shopify/shopify-app-remix/server';
 import { MemorySessionStorage } from '@shopify/shopify-app-session-storage-memory';
@@ -1564,29 +1564,19 @@ function ProgressIndicator({ current, steps }) {
     const isComplete = current > stepNumber;
     const isUpcoming = current < stepNumber;
     return /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "center", blockAlign: "center", children: [
-      /* @__PURE__ */ jsx(
-        Box,
-        {
-          background: isActive ? "bg-fill-emphasis" : isComplete ? "bg-fill-success" : "bg-fill-tertiary",
-          padding: "100",
-          borderRadius: "full",
-          width: "32px",
-          height: "32px",
-          minHeight: "32px",
-          minWidth: "32px",
-          position: "relative",
-          children: /* @__PURE__ */ jsx("div", { style: {
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            height: "100%",
-            color: isActive || isComplete ? "#fff" : "#6b7280",
-            fontSize: "14px",
-            fontWeight: "600"
-          }, children: isComplete ? /* @__PURE__ */ jsx(CheckIcon, {}) : stepNumber })
-        }
-      ),
+      /* @__PURE__ */ jsx("div", { style: {
+        width: "28px",
+        height: "28px",
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: isActive ? "var(--p-color-bg-fill-brand)" : isComplete ? "var(--p-color-bg-fill-success)" : "var(--p-color-bg-fill-secondary)",
+        color: isActive || isComplete ? "#fff" : "var(--p-color-text-secondary)",
+        fontSize: "13px",
+        fontWeight: "600",
+        flexShrink: 0
+      }, children: isComplete ? /* @__PURE__ */ jsx("svg", { viewBox: "0 0 20 20", width: "14", height: "14", fill: "currentColor", children: /* @__PURE__ */ jsx("path", { d: "M8.72 13.78a.75.75 0 0 1-1.06 0l-3.22-3.22a.75.75 0 0 1 1.06-1.06l2.69 2.69 5.47-5.47a.75.75 0 0 1 1.06 1.06l-6 6Z" }) }) : stepNumber }),
       /* @__PURE__ */ jsxs(Box, { children: [
         /* @__PURE__ */ jsx(
           Text,
@@ -1667,24 +1657,18 @@ function StepCard({
             },
             children: /* @__PURE__ */ jsxs(InlineStack, { align: "space-between", blockAlign: "center", children: [
               /* @__PURE__ */ jsxs(InlineStack, { gap: "300", align: "start", blockAlign: "center", children: [
-                /* @__PURE__ */ jsx(
-                  Box,
-                  {
-                    background: state === "active" ? "bg-fill-emphasis" : state === "complete" ? "bg-fill-success" : "bg-fill-tertiary",
-                    padding: "200",
-                    borderRadius: "full",
-                    minWidth: "32px",
-                    minHeight: "32px",
-                    children: /* @__PURE__ */ jsx("div", { style: {
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: state === "inactive" ? "#6b7280" : "#fff",
-                      fontSize: "14px",
-                      fontWeight: "600"
-                    }, children: state === "complete" ? /* @__PURE__ */ jsx(Icon, { source: CheckIcon }) : step })
-                  }
-                ),
+                /* @__PURE__ */ jsx("div", { style: {
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: state === "active" ? "var(--p-color-bg-fill-brand)" : state === "complete" ? "var(--p-color-bg-fill-success)" : "var(--p-color-bg-fill-secondary)",
+                  color: state === "inactive" ? "var(--p-color-text-secondary)" : "#fff",
+                  fontSize: "14px",
+                  fontWeight: "600"
+                }, children: state === "complete" ? /* @__PURE__ */ jsx("svg", { viewBox: "0 0 20 20", width: "16", height: "16", fill: "currentColor", children: /* @__PURE__ */ jsx("path", { d: "M8.72 13.78a.75.75 0 0 1-1.06 0l-3.22-3.22a.75.75 0 0 1 1.06-1.06l2.69 2.69 5.47-5.47a.75.75 0 0 1 1.06 1.06l-6 6Z" }) }) : step }),
                 /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
                   /* @__PURE__ */ jsx(
                     Text,
@@ -1760,20 +1744,15 @@ function MethodCard({
           padding: "400",
           children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
             /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
-              /* @__PURE__ */ jsx(
-                Box,
-                {
-                  background: active ? "bg-fill-emphasis" : "bg-fill-tertiary",
-                  padding: "200",
-                  borderRadius: "base",
-                  children: /* @__PURE__ */ jsx("div", { style: {
-                    color: active ? "#fff" : "#6b7280",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center"
-                  }, children: /* @__PURE__ */ jsx(Icon, { source: icon }) })
-                }
-              ),
+              /* @__PURE__ */ jsx("div", { style: {
+                width: "40px",
+                height: "40px",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: active ? "var(--p-color-bg-fill-brand)" : "var(--p-color-bg-fill-secondary)"
+              }, children: /* @__PURE__ */ jsx(Icon, { source: icon, tone: active ? "textInverse" : "subdued" }) }),
               /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
                 /* @__PURE__ */ jsx(
                   Text,
@@ -1842,20 +1821,22 @@ function ExtractionProgress({ isActive, stages, insights = [] }) {
   const currentInsightText = insights[currentInsight];
   return /* @__PURE__ */ jsx(Box, { padding: "400", background: "bg-fill-tertiary", borderRadius: "base", children: /* @__PURE__ */ jsxs(BlockStack, { gap: "300", children: [
     /* @__PURE__ */ jsxs(InlineStack, { gap: "200", align: "start", blockAlign: "center", children: [
-      /* @__PURE__ */ jsx(
-        Box,
-        {
-          background: "bg-fill-emphasis",
-          padding: "200",
-          borderRadius: "full",
-          children: /* @__PURE__ */ jsx("div", { style: {
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }, children: /* @__PURE__ */ jsx(Icon, { source: MagicIcon }) })
-        }
-      ),
+      /* @__PURE__ */ jsx("div", { style: {
+        width: "36px",
+        height: "36px",
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "var(--p-color-bg-fill-brand)",
+        color: "#fff"
+      }, children: /* @__PURE__ */ jsxs("svg", { viewBox: "0 0 20 20", width: "20", height: "20", fill: "currentColor", children: [
+        /* @__PURE__ */ jsx("path", { d: "M5.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" }),
+        /* @__PURE__ */ jsx("path", { d: "M5 8a.75.75 0 0 1 .75.75v6.5a.75.75 0 0 1-1.5 0v-6.5A.75.75 0 0 1 5 8Z" }),
+        /* @__PURE__ */ jsx("path", { d: "M12.75 5.25a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Z" }),
+        /* @__PURE__ */ jsx("path", { d: "M14 12.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z" }),
+        /* @__PURE__ */ jsx("path", { d: "M9 5.75a.75.75 0 0 0-1.5 0v.688a3.75 3.75 0 0 0 0 7.124v.688a.75.75 0 0 0 1.5 0v-.688a3.75 3.75 0 0 0 0-7.124V5.75Z" })
+      ] }) }),
       /* @__PURE__ */ jsxs(BlockStack, { gap: "100", children: [
         /* @__PURE__ */ jsx(Text, { as: "h4", variant: "bodyMd", fontWeight: "semibold", children: "AI is extracting your content..." }),
         /* @__PURE__ */ jsx(Text, { as: "p", variant: "bodySm", tone: "subdued", children: "This usually takes 10-15 seconds" })
@@ -3392,7 +3373,7 @@ const route8 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   loader
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','imports':['/assets/components-DKwNRbqV.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-B4Pd06ft.js','imports':['/assets/components-DKwNRbqV.js'],'css':['/assets/root-DgT1QTbr.css']},'routes/app._index.original':{'id':'routes/app._index.original','parentId':'routes/app._index','path':'original','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index.original-B4Nyuu1u.js','imports':['/assets/components-DKwNRbqV.js','/assets/SearchIcon.svg-sR3tMc0V.js','/assets/Page-P-8IetFp.js','/assets/context-BRhAIWmx.js','/assets/FormLayout-CLAstZ-x.js'],'css':[]},'routes/api.extract':{'id':'routes/api.extract','parentId':'root','path':'api/extract','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.extract-l0sNRNKZ.js','imports':[],'css':[]},'routes/app._index':{'id':'routes/app._index','parentId':'routes/app','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index-DKCk-dd-.js','imports':['/assets/components-DKwNRbqV.js','/assets/Page-P-8IetFp.js','/assets/SearchIcon.svg-sR3tMc0V.js','/assets/context-BRhAIWmx.js'],'css':[]},'routes/auth.login':{'id':'routes/auth.login','parentId':'root','path':'auth/login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/route-DACMr74n.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/Page-P-8IetFp.js','/assets/FormLayout-CLAstZ-x.js','/assets/context-BRhAIWmx.js'],'css':[]},'routes/webhooks':{'id':'routes/webhooks','parentId':'root','path':'webhooks','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webhooks-l0sNRNKZ.js','imports':[],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-l0sNRNKZ.js','imports':[],'css':[]},'routes/auth.$':{'id':'routes/auth.$','parentId':'root','path':'auth/*','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/auth._-l0sNRNKZ.js','imports':[],'css':[]},'routes/app':{'id':'routes/app','parentId':'root','path':'app','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app-1Wf0Ek65.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/context-BRhAIWmx.js'],'css':[]}},'url':'/assets/manifest-66af95d6.js','version':'66af95d6'};
+const serverManifest = {'entry':{'module':'/assets/entry.client-vlObnO-v.js','imports':['/assets/components-DKwNRbqV.js'],'css':[]},'routes':{'root':{'id':'root','parentId':undefined,'path':'','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/root-B4Pd06ft.js','imports':['/assets/components-DKwNRbqV.js'],'css':['/assets/root-DgT1QTbr.css']},'routes/app._index.original':{'id':'routes/app._index.original','parentId':'routes/app._index','path':'original','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index.original-DeR5N7ps.js','imports':['/assets/components-DKwNRbqV.js','/assets/SearchIcon.svg-Pl61KX6Q.js','/assets/Page-P-8IetFp.js','/assets/context-BRhAIWmx.js','/assets/FormLayout-CLAstZ-x.js'],'css':[]},'routes/api.extract':{'id':'routes/api.extract','parentId':'root','path':'api/extract','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/api.extract-l0sNRNKZ.js','imports':[],'css':[]},'routes/app._index':{'id':'routes/app._index','parentId':'routes/app','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app._index-DyWajh7p.js','imports':['/assets/components-DKwNRbqV.js','/assets/Page-P-8IetFp.js','/assets/context-BRhAIWmx.js','/assets/SearchIcon.svg-Pl61KX6Q.js'],'css':[]},'routes/auth.login':{'id':'routes/auth.login','parentId':'root','path':'auth/login','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/route-DACMr74n.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/Page-P-8IetFp.js','/assets/FormLayout-CLAstZ-x.js','/assets/context-BRhAIWmx.js'],'css':[]},'routes/webhooks':{'id':'routes/webhooks','parentId':'root','path':'webhooks','index':undefined,'caseSensitive':undefined,'hasAction':true,'hasLoader':false,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/webhooks-l0sNRNKZ.js','imports':[],'css':[]},'routes/_index':{'id':'routes/_index','parentId':'root','path':undefined,'index':true,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/_index-l0sNRNKZ.js','imports':[],'css':[]},'routes/auth.$':{'id':'routes/auth.$','parentId':'root','path':'auth/*','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':false,'module':'/assets/auth._-l0sNRNKZ.js','imports':[],'css':[]},'routes/app':{'id':'routes/app','parentId':'root','path':'app','index':undefined,'caseSensitive':undefined,'hasAction':false,'hasLoader':true,'hasClientAction':false,'hasClientLoader':false,'hasErrorBoundary':true,'module':'/assets/app-1Wf0Ek65.js','imports':['/assets/components-DKwNRbqV.js','/assets/en-DrG88aOV.js','/assets/context-BRhAIWmx.js'],'css':[]}},'url':'/assets/manifest-9defcba3.js','version':'9defcba3'};
 
 /**
        * `mode` is only relevant for the old Remix compiler but

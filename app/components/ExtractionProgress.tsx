@@ -74,20 +74,24 @@ export function ExtractionProgress({ isActive, stages, insights = [] }: Extracti
       <BlockStack gap="300">
         {/* Header */}
         <InlineStack gap="200" align="start" blockAlign="center">
-          <Box
-            background="bg-fill-emphasis"
-            padding="200"
-            borderRadius="full"
-          >
-            <div style={{
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Icon source={MagicIcon} />
-            </div>
-          </Box>
+          <div style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'var(--p-color-bg-fill-brand)',
+            color: '#fff'
+          }}>
+            <svg viewBox="0 0 20 20" width="20" height="20" fill="currentColor">
+              <path d="M5.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>
+              <path d="M5 8a.75.75 0 0 1 .75.75v6.5a.75.75 0 0 1-1.5 0v-6.5A.75.75 0 0 1 5 8Z"/>
+              <path d="M12.75 5.25a.75.75 0 0 0-1.5 0v6.5a.75.75 0 0 0 1.5 0v-6.5Z"/>
+              <path d="M14 12.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"/>
+              <path d="M9 5.75a.75.75 0 0 0-1.5 0v.688a3.75 3.75 0 0 0 0 7.124v.688a.75.75 0 0 0 1.5 0v-.688a3.75 3.75 0 0 0 0-7.124V5.75Z"/>
+            </svg>
+          </div>
           
           <BlockStack gap="100">
             <Text as="h4" variant="bodyMd" fontWeight="semibold">

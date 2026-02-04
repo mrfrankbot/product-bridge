@@ -82,34 +82,30 @@ export function StepCard({
           <InlineStack align="space-between" blockAlign="center">
             <InlineStack gap="300" align="start" blockAlign="center">
               {/* Step Number/Icon */}
-              <Box
-                background={
-                  state === 'active' 
-                    ? "bg-fill-emphasis" 
-                    : state === 'complete' 
-                      ? "bg-fill-success" 
-                      : "bg-fill-tertiary"
-                }
-                padding="200"
-                borderRadius="full"
-                minWidth="32px"
-                minHeight="32px"
-              >
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  color: state === 'inactive' ? '#6b7280' : '#fff',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}>
-                  {state === 'complete' ? (
-                    <Icon source={CheckIcon} />
-                  ) : (
-                    step
-                  )}
-                </div>
-              </Box>
+              <div style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: state === 'active' 
+                  ? 'var(--p-color-bg-fill-brand)' 
+                  : state === 'complete' 
+                    ? 'var(--p-color-bg-fill-success)' 
+                    : 'var(--p-color-bg-fill-secondary)',
+                color: state === 'inactive' ? 'var(--p-color-text-secondary)' : '#fff',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                {state === 'complete' ? (
+                  <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
+                    <path d="M8.72 13.78a.75.75 0 0 1-1.06 0l-3.22-3.22a.75.75 0 0 1 1.06-1.06l2.69 2.69 5.47-5.47a.75.75 0 0 1 1.06 1.06l-6 6Z"/>
+                  </svg>
+                ) : (
+                  step
+                )}
+              </div>
 
               {/* Title and Description */}
               <BlockStack gap="100">
