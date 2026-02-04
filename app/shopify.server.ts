@@ -6,13 +6,12 @@ import {
   LATEST_API_VERSION,
 } from "@shopify/shopify-app-remix/server";
 import { MemorySessionStorage } from "@shopify/shopify-app-session-storage-memory";
-import { KVSessionStorage } from "./session-storage.server";
 
-// Use KV storage in production (Vercel), memory in development
-const isProduction = process.env.NODE_ENV === "production" || process.env.KV_REST_API_URL;
-const sessionStorage = isProduction ? new KVSessionStorage() : new MemorySessionStorage();
+// Always use memory storage for now until KV is properly configured
+// This means sessions won't persist across cold starts, but the app will work
+const sessionStorage = new MemorySessionStorage();
 
-console.log(`Using ${isProduction ? 'Vercel KV' : 'Memory'} session storage`);
+console.log("Using Memory session storage");
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
