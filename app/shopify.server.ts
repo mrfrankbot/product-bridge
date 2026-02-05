@@ -13,12 +13,17 @@ const sessionStorage = new MemorySessionStorage();
 
 console.log("Using Memory session storage");
 
+// Force production URL - Replit config keeps reverting
+const PRODUCTION_APP_URL = "https://product-bridge.replit.app";
+const appUrl = process.env.SHOPIFY_APP_URL || PRODUCTION_APP_URL;
+console.log("[shopify.server] Using SHOPIFY_APP_URL:", appUrl);
+
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: LATEST_API_VERSION,
   scopes: process.env.SCOPES?.split(",") || ["read_products", "write_products", "read_metafields", "write_metafields"],
-  appUrl: process.env.SHOPIFY_APP_URL || "",
+  appUrl: appUrl,
   authPathPrefix: "/auth",
   sessionStorage: sessionStorage as any,
   distribution: AppDistribution.AppStore,
