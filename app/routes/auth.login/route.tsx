@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { Form, useActionData, useLoaderData } from "@remix-run/react";
 import {
   Page,
@@ -15,15 +15,6 @@ import { login } from "../../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shopError = url.searchParams.get("shop-error");
-  
-  // Auto-initiate OAuth if shop param is present (coming from Shopify admin)
-  const shop = url.searchParams.get("shop");
-  if (shop) {
-    console.log("[auth.login] Auto-initiating OAuth for shop:", shop);
-    // Redirect to auth path with shop param - Shopify library handles OAuth from there
-    throw redirect(`/auth?shop=${encodeURIComponent(shop)}`);
-  }
-  
   return json({ shopError });
 };
 
