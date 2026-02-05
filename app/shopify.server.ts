@@ -5,13 +5,16 @@ import {
   shopifyApp,
   LATEST_API_VERSION,
 } from "@shopify/shopify-app-remix/server";
-import { MemorySessionStorage } from "@shopify/shopify-app-session-storage-memory";
+import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
+import { PrismaClient } from "@prisma/client";
 
-// Always use memory storage for now until KV is properly configured
-// This means sessions won't persist across cold starts, but the app will work
-const sessionStorage = new MemorySessionStorage();
+// Initialize Prisma client for session storage
+const prisma = new PrismaClient();
 
-console.log("Using Memory session storage");
+// Use Prisma session storage for persistence across cold starts
+const sessionStorage = new PrismaSessionStorage(prisma);
+
+console.log("Using Prisma session storage (PostgreSQL)");
 
 // Force production URL - Replit config keeps reverting
 const PRODUCTION_APP_URL = "https://product-bridge.replit.app";
@@ -43,4 +46,4 @@ export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
-export { sessionStorage };
+export { sessionStorage, prisma };

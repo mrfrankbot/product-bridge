@@ -1,0 +1,47 @@
+// This is your Prisma schema file for Product Bridge
+// Uses PostgreSQL (Replit's production database)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Session storage for Shopify OAuth
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String?
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+
+  @@index([shop])
+}
+
+// Prompt templates for AI description rewriting
+model PromptTemplate {
+  id         Int       @id @default(autoincrement())
+  name       String
+  category   String
+  promptText String    @db.Text
+  isDefault  Boolean   @default(false)
+  shop       String?   // null = system template available to all
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([shop])
+  @@index([category])
+}
