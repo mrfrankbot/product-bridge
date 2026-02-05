@@ -8,9 +8,7 @@ import {
   TextField,
   Button,
   Text,
-  AppProvider,
 } from "@shopify/polaris";
-import enTranslations from "@shopify/polaris/locales/en.json";
 import { useState } from "react";
 import { login } from "../../shopify.server";
 
@@ -33,29 +31,27 @@ export default function Auth() {
   const errorMessage = shopError || (actionData?.errors as any)?.shop;
 
   return (
-    <AppProvider i18n={enTranslations}>
-      <Page>
-        <Card>
-          <Form method="post">
-            <FormLayout>
-              <Text variant="headingMd" as="h2">
-                Log in to Product Bridge
-              </Text>
-              <TextField
-                type="text"
-                name="shop"
-                label="Shop domain"
-                helpText="yourshop.myshopify.com"
-                value={shop}
-                onChange={setShop}
-                autoComplete="on"
-                error={errorMessage || undefined}
-              />
-              <Button submit>Log in</Button>
-            </FormLayout>
-          </Form>
-        </Card>
-      </Page>
-    </AppProvider>
+    <Page>
+      <Card>
+        <Form method="post">
+          <FormLayout>
+            <Text variant="headingMd" as="h2">
+              Log in to Product Bridge
+            </Text>
+            <TextField
+              type="text"
+              name="shop"
+              label="Shop domain"
+              helpText="yourshop.myshopify.com"
+              value={shop}
+              onChange={setShop}
+              autoComplete="on"
+              error={errorMessage || undefined}
+            />
+            <Button submit>Log in</Button>
+          </FormLayout>
+        </Form>
+      </Card>
+    </Page>
   );
 }
