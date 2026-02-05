@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { Form, useActionData, useLoaderData } from "@remix-run/react";
 import {
   Page,
@@ -15,6 +15,24 @@ import { login } from "../../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shopError = url.searchParams.get("shop-error");
+  
+  // Auto-initiate OAuth if shop param is present (coming from Shopify admin)
+  const shop = url.searchParams.get("shop");
+  if (shop) {
+    console.log("[auth.login] Auto-initiating OAuth for shop:", shop);
+    // Create a POST request to trigger the login action
+    const formData = new FormData();
+    formData.append("shop", shop);
+    const postRequest = new Request(request.url, {
+      method: "POST",
+      body: formData,
+    });
+    // This will throw a redirect to start OAuth
+    const errors = await login(postRequest);
+    // If we get here, there was an error
+    return json({ shopError: (errors as any)?.shop || "Failed to start OAuth" });
+  }
+  
   return json({ shopError });
 };
 
