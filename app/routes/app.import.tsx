@@ -582,7 +582,7 @@ export default function ImportPage() {
                 <Text as="h2" variant="headingMd">
                   Workflow status
                 </Text>
-                <Badge tone="info">Step {currentStep} of 3</Badge>
+                <Badge tone="info">{`Step ${currentStep} of 3`}</Badge>
               </InlineStack>
               <DataTable
                 columnContentTypes={["text", "text"]}

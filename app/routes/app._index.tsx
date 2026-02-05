@@ -8,14 +8,19 @@ import {
   InlineStack,
   Text,
   Button,
-  Badge,
+  Icon,
   ResourceList,
   ResourceItem,
   Thumbnail,
   EmptyState,
-  DataTable,
+  Box,
 } from "@shopify/polaris";
-import { ImportIcon, ProductIcon, SettingsIcon, CheckIcon } from "@shopify/polaris-icons";
+import {
+  ImportIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  ProductIcon,
+} from "@shopify/polaris-icons";
 
 import { authenticate } from "../shopify.server";
 
@@ -24,6 +29,7 @@ interface EnhancedProduct {
   title: string;
   handle: string;
   updatedAtLabel: string;
+  updatedAtRelative: string;
   featuredImage?: { url: string; altText?: string } | null;
   contentStatus: {
     hasSpecs: boolean;
@@ -33,6 +39,9 @@ interface EnhancedProduct {
 
 const DASHBOARD_QUERY = `#graphql
   query ProductBridgeDashboard {
+    shop {
+      name
+    }
     productsCount(query: "metafields.namespace:product_bridge") { count }
     products(
       first: 5
@@ -64,37 +73,71 @@ const DASHBOARD_QUERY = `#graphql
   }
 `;
 
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function getRelativeTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) {
+    return diffMins <= 1 ? "Just now" : `${diffMins} minutes ago`;
+  }
+  if (diffHours < 24) {
+    return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+  }
+  if (diffDays === 1) {
+    return "Yesterday";
+  }
+  if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  }
+  return formatDate(value);
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
 
   const response = await admin.graphql(DASHBOARD_QUERY);
   const data = await response.json();
-  const formatDate = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-    return new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      timeZone: "UTC",
-    }).format(date);
-  };
+
+  const shopName = data.data?.shop?.name || "Your Store";
+  const totalEnhanced = data.data?.productsCount?.count || 0;
 
   const recentProducts: EnhancedProduct[] =
     data.data?.products?.edges?.map((edge: any) => {
       const product = edge.node;
-      const metafields = product.metafields.edges.reduce((acc: any, metafield: any) => {
-        acc[metafield.node.key] = metafield.node.value;
-        return acc;
-      }, {} as Record<string, string>);
+      const metafields = product.metafields.edges.reduce(
+        (acc: any, metafield: any) => {
+          acc[metafield.node.key] = metafield.node.value;
+          return acc;
+        },
+        {} as Record<string, string>
+      );
 
       return {
         id: product.id,
         title: product.title,
         handle: product.handle,
         updatedAtLabel: formatDate(product.updatedAt),
+        updatedAtRelative: getRelativeTime(product.updatedAt),
         featuredImage: product.featuredImage,
         contentStatus: {
           hasSpecs: !!metafields.specs,
@@ -103,126 +146,157 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       };
     }) || [];
 
+  const specsCount = recentProducts.filter(
+    (p) => p.contentStatus.hasSpecs
+  ).length;
+  const lastActivity =
+    recentProducts.length > 0 ? recentProducts[0].updatedAtRelative : "Never";
+
   return json({
-    totalEnhanced: data.data?.productsCount?.count || 0,
+    shopName,
+    totalEnhanced,
+    specsCount,
+    lastActivity,
     recentProducts,
   });
 };
 
+function StatCard({
+  value,
+  label,
+  icon,
+}: {
+  value: string | number;
+  label: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <Card padding="400">
+      <BlockStack gap="200" align="center">
+        <Box
+          background="bg-surface-secondary"
+          padding="300"
+          borderRadius="full"
+        >
+          {icon}
+        </Box>
+        <Text as="p" variant="headingXl" alignment="center">
+          {value}
+        </Text>
+        <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+          {label}
+        </Text>
+      </BlockStack>
+    </Card>
+  );
+}
+
 export default function Dashboard() {
-  const { totalEnhanced, recentProducts } = useLoaderData<typeof loader>();
-  const specsReady = recentProducts.filter((product) => product.contentStatus.hasSpecs).length;
-  const highlightsReady = recentProducts.filter((product) => product.contentStatus.hasHighlights).length;
+  const { shopName, totalEnhanced, specsCount, lastActivity, recentProducts } =
+    useLoaderData<typeof loader>();
 
   return (
-    <Page
-      title="Product Bridge"
-      subtitle="Turn manufacturer specs into polished Shopify product content."
-      primaryAction={{ content: "Import Specs", url: "/app/import", icon: ImportIcon }}
-    >
+    <Page title="Product Bridge">
       <Layout>
+        {/* Welcome Banner */}
         <Layout.Section>
-          <Card padding="500">
+          <Card padding="600">
             <BlockStack gap="200">
-              <Text as="h2" variant="headingLg">
-                Product Bridge
+              <Text as="h1" variant="headingLg">
+                Welcome back, {shopName}! 👋
               </Text>
               <Text as="p" variant="bodyMd" tone="subdued">
-                Extract structured specs, highlights, and included items from PDFs, URLs, or raw
-                text — then save directly to product metafields.
+                Product Bridge is ready to enhance your catalog with structured
+                specs and highlights.
               </Text>
             </BlockStack>
           </Card>
         </Layout.Section>
 
+        {/* Stats Row */}
         <Layout.Section>
-          <Card padding="500">
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Overview
-              </Text>
-              <DataTable
-                columnContentTypes={["text", "numeric"]}
-                headings={["Metric", "Value"]}
-                rows={[
-                  ["Total products enhanced", totalEnhanced],
-                  ["Recent products with specs", specsReady],
-                  ["Recent products with highlights", highlightsReady],
-                ]}
+          <InlineStack gap="400" wrap={false}>
+            <div style={{ flex: 1 }}>
+              <StatCard
+                value={totalEnhanced}
+                label="Products Enhanced"
+                icon={<Icon source={ProductIcon} tone="base" />}
               />
+            </div>
+            <div style={{ flex: 1 }}>
+              <StatCard
+                value={specsCount}
+                label="Specs Extracted"
+                icon={<Icon source={CheckCircleIcon} tone="success" />}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <StatCard
+                value={lastActivity}
+                label="Last Activity"
+                icon={<Icon source={ClockIcon} tone="base" />}
+              />
+            </div>
+          </InlineStack>
+        </Layout.Section>
+
+        {/* Big CTA */}
+        <Layout.Section>
+          <Card padding="600" background="bg-surface-success">
+            <BlockStack gap="400" align="center">
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingLg" alignment="center">
+                  🚀 Enhance a Product
+                </Text>
+                <Text as="p" variant="bodyMd" tone="subdued" alignment="center">
+                  Import specs from manufacturer PDFs, URLs, or text — AI
+                  extracts the structure automatically.
+                </Text>
+              </BlockStack>
+              <Link to="/app/import" style={{ textDecoration: "none" }}>
+                <Button variant="primary" size="large" icon={ImportIcon}>
+                  Start Import
+                </Button>
+              </Link>
             </BlockStack>
           </Card>
         </Layout.Section>
 
+        {/* Recent Activity */}
         <Layout.Section>
-          <Card padding="500">
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Quick actions
-              </Text>
-              <InlineStack gap="400" wrap>
-                <Card padding="400">
-                  <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">
-                      Import Specs
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Start the extraction workflow.
-                    </Text>
-                    <Link to="/app/import" style={{ textDecoration: "none" }}>
-                      <Button variant="primary" icon={ImportIcon}>
-                        Import Specs
-                      </Button>
-                    </Link>
-                  </BlockStack>
-                </Card>
-                <Card padding="400">
-                  <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">
-                      View Products
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      See enhanced products.
-                    </Text>
-                    <Link to="/app/products" style={{ textDecoration: "none" }}>
-                      <Button variant="secondary" icon={ProductIcon}>
-                        View Products
-                      </Button>
-                    </Link>
-                  </BlockStack>
-                </Card>
-                <Card padding="400">
-                  <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">
-                      Settings
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Manage app preferences.
-                    </Text>
-                    <Link to="/app/settings" style={{ textDecoration: "none" }}>
-                      <Button variant="secondary" icon={SettingsIcon}>
-                        Settings
-                      </Button>
-                    </Link>
-                  </BlockStack>
-                </Card>
+          <Card padding="400">
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Recent Activity
+                </Text>
+                <Link to="/app/products" style={{ textDecoration: "none" }}>
+                  <Button variant="plain">View all products</Button>
+                </Link>
               </InlineStack>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
 
-        <Layout.Section>
-          <Card padding="500">
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">
-                Recent activity
-              </Text>
               {recentProducts.length > 0 ? (
                 <ResourceList
                   resourceName={{ singular: "product", plural: "products" }}
                   items={recentProducts}
                   renderItem={(product) => {
-                    const { id, title, handle, featuredImage, updatedAtLabel, contentStatus } = product;
+                    const {
+                      id,
+                      title,
+                      handle,
+                      featuredImage,
+                      updatedAtRelative,
+                      contentStatus,
+                    } = product;
+
+                    const statusText =
+                      contentStatus.hasSpecs && contentStatus.hasHighlights
+                        ? "✅ Fully enhanced"
+                        : contentStatus.hasSpecs
+                          ? "✅ Specs added"
+                          : contentStatus.hasHighlights
+                            ? "✅ Highlights added"
+                            : "📝 Partially enhanced";
 
                     return (
                       <ResourceItem
@@ -235,30 +309,21 @@ export default function Dashboard() {
                             size="small"
                           />
                         }
+                        accessibilityLabel={`View ${title}`}
                       >
-                        <InlineStack align="space-between" blockAlign="center">
-                          <BlockStack gap="100">
+                        <InlineStack
+                          align="space-between"
+                          blockAlign="center"
+                          wrap={false}
+                        >
+                          <BlockStack gap="050">
                             <Text as="h3" variant="bodyMd" fontWeight="semibold">
                               {title}
                             </Text>
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Updated {updatedAtLabel}
+                              {updatedAtRelative} • {statusText}
                             </Text>
                           </BlockStack>
-                          <InlineStack gap="200">
-                            <Badge
-                              tone={contentStatus.hasSpecs ? "success" : "attention"}
-                              icon={contentStatus.hasSpecs ? CheckIcon : undefined}
-                            >
-                              Specs
-                            </Badge>
-                            <Badge
-                              tone={contentStatus.hasHighlights ? "success" : "attention"}
-                              icon={contentStatus.hasHighlights ? CheckIcon : undefined}
-                            >
-                              Highlights
-                            </Badge>
-                          </InlineStack>
                         </InlineStack>
                       </ResourceItem>
                     );
@@ -270,7 +335,10 @@ export default function Dashboard() {
                   action={{ content: "Import Specs", url: "/app/import" }}
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                 >
-                  <p>Start by importing specs for your first product.</p>
+                  <p>
+                    Start by importing specs for your first product to see
+                    activity here.
+                  </p>
                 </EmptyState>
               )}
             </BlockStack>
