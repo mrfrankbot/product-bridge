@@ -9,7 +9,20 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const url = new URL(request.url);
+  console.log("[app.tsx] Request URL:", request.url);
+  console.log("[app.tsx] shop param:", url.searchParams.get("shop"));
+  console.log("[app.tsx] host param:", url.searchParams.get("host"));
+  console.log("[app.tsx] embedded param:", url.searchParams.get("embedded"));
+  console.log("[app.tsx] id_token param:", url.searchParams.get("id_token") ? "present" : "missing");
+  
+  try {
+    await authenticate.admin(request);
+    console.log("[app.tsx] authenticate.admin succeeded");
+  } catch (error) {
+    console.log("[app.tsx] authenticate.admin threw:", error);
+    throw error;
+  }
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
 };
 
